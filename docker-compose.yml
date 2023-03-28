@@ -1,0 +1,14 @@
+version: "3.9"
+services:
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: levity
+      POSTGRES_DB: levity
+      POSTGRES_PASSWORD: levity
+  rabbitmq:
+    image: rabbitmq:3-alpine
+    ports:
+      - '5672:5672'
