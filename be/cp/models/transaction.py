@@ -9,3 +9,5 @@ class Transaction(models.Model):
     stopped_at = models.DateTimeField(null=True)
     remote_started_at = models.DateTimeField(null=True)
     remote_stopped_at = models.DateTimeField(null=True)
+    connector_id = models.CharField(max_length=64)
+    id_tag = models.CharField(max_length=256)
