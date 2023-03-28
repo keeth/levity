@@ -1,18 +1,14 @@
-#!/usr/bin/env python3
 import asyncio
 import json
 import logging
 import os
-import signal
 from asyncio import Event
 from typing import Optional
 
 import aio_pika
 from aio_pika import Message
 from aio_pika.abc import (
-    AbstractRobustConnection,
     AbstractRobustChannel,
-    AbstractRobustQueue,
 )
 from dotenv import load_dotenv
 from starlette.applications import Starlette
@@ -59,24 +55,35 @@ class MainWebsocket(WebSocketEndpoint):
 
     async def on_receive(self, websocket, ws_message):
         charge_point_id = websocket.path_params[CHARGE_POINT_ID]
-        logger.debug("WS receive %s %s %s", id(websocket), charge_point_id, ws_message)
+        logger.debug("WS RECEIVE %s %s", charge_point_id, ws_message)
         await self._rpc_send(
             dict(type="receive", id=charge_point_id, message=ws_message)
         )
 
     async def on_connect(self, websocket):
         charge_point_id = websocket.path_params[CHARGE_POINT_ID]
-        logger.info("WS connect %s %s", id(websocket), charge_point_id)
+
+        logger.info(
+            "WS CONNECT %s %s",
+            charge_point_id,
+            websocket.client.host,
+        )
         await websocket.accept(
             subprotocol=websocket.headers.get("sec-websocket-protocol")
         )
-        clients[id(websocket)] = {"ws": websocket, "id": charge_point_id}
+        if charge_point_id in clients:
+            logger.warning(
+                "Charge point %s already connected from %s",
+                charge_point_id,
+                clients[charge_point_id]["ws"].client.host,
+            )
+        clients[charge_point_id] = dict(ws=websocket, id=charge_point_id)
         await self._rpc_send(dict(type="connect", id=charge_point_id))
 
     async def on_disconnect(self, websocket, close_code):
         charge_point_id = websocket.path_params[CHARGE_POINT_ID]
-        del clients[id(websocket)]
-        logger.info("WS disconnect %s %s", id(websocket), charge_point_id)
+        del clients[charge_point_id]
+        logger.info("WS DISCONNECT %s %s", id(websocket), charge_point_id)
         await self._rpc_send(dict(type="disconnect", id=charge_point_id))
 
 
