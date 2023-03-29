@@ -9,6 +9,12 @@ class ChargePoint(Timestamped):
     status = models.CharField(
         max_length=64, choices=ChargePointStatus.choices(), default="", blank=True
     )
+    error_code = models.CharField(
+        max_length=64, choices=ChargePointStatus.choices(), default="", blank=True
+    )
+    vendor_error_code = models.CharField(max_length=64, default="", blank=True)
+    vendor_status_info = models.CharField(max_length=64, default="", blank=True)
+    vendor_status_id = models.CharField(max_length=255, default="", blank=True)
     is_connected = models.BooleanField(default=False)
     last_heartbeat_at = models.DateTimeField(null=True)
     last_boot_at = models.DateTimeField(null=True)

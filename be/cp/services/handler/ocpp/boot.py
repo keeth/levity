@@ -2,10 +2,11 @@ from django.utils import timezone
 
 from cp.models.message import Message
 from cp.services.handler.ocpp.base import OCPPMessageHandler
+from cp.types.registration_status import RegistrationStatus
 
 
 class BootHandler(OCPPMessageHandler):
-    def handle(self, message: Message):
+    def handle(self, message: Message) -> Message:
         cp = message.charge_point
         cp.hw_firmware = message.data.get("firmwareVersion", "")
         cp.hw_model = message.data.get("chargePointModel", "")
@@ -20,4 +21,12 @@ class BootHandler(OCPPMessageHandler):
                 "hw_serial",
                 "last_boot_at",
             ]
+        )
+        return self._reply(
+            message,
+            dict(
+                currentTime=timezone.now(),
+                interval=14400,
+                status=RegistrationStatus.Accepted,
+            ),
         )

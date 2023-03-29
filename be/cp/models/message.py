@@ -13,7 +13,7 @@ class Message(Timestamped):
     message_type = models.IntegerField()
     unique_id = models.CharField(max_length=128)
     actor = models.CharField(max_length=64, choices=ActorType.choices())
-    action = models.CharField(max_length=64, choices=Action.choices())
+    action = models.CharField(max_length=64, choices=Action.choices(), null=True)
     data = models.JSONField()
     reply = models.ForeignKey("cp.Message", on_delete=models.SET_NULL)
 

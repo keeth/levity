@@ -7,4 +7,7 @@ class ModelEnum(Enum):
         return [(i.value, i.value) for i in cls]
 
     def __str__(self):
-        return self.value
+        return str(self.value)
+
+    def __int__(self):
+        return int(self.value)

@@ -7,7 +7,7 @@ from cp.services.handler.ocpp.base import OCPPMessageHandler
 
 
 class MeterValuesHandler(OCPPMessageHandler):
-    def handle(self, message: Message):
+    def handle(self, message: Message) -> Message:
         transaction = Transaction.objects.get(id=message.data["transactionId"])
         for value in message.data["meterValue"]:
             MeterValue.objects.create(
@@ -21,3 +21,7 @@ class MeterValuesHandler(OCPPMessageHandler):
                 unit=value.get("unit"),
                 value=value.get("value"),
             )
+        return self._reply(
+            message,
+            {},
+        )
