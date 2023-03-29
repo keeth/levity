@@ -1,9 +1,8 @@
-from ocpp.models.message import Message
 from ocpp.services.ocpp.base import OCPPMiddleware, OCPPRequest, OCPPResponse
 from ocpp.types.charge_point_status import ChargePointStatus
 
 
-class StatusNotificationHandler(OCPPMiddleware):
+class StatusNotificationMiddleware(OCPPMiddleware):
     def handle(self, req: OCPPRequest) -> OCPPResponse:
         message = req.message
         charge_point = message.charge_point

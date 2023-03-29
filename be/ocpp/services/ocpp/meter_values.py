@@ -1,9 +1,8 @@
-from ocpp.models.message import Message
 from ocpp.models.meter_value import MeterValue
 from ocpp.services.ocpp.base import OCPPMiddleware, OCPPRequest, OCPPResponse
 
 
-class MeterValuesHandler(OCPPMiddleware):
+class MeterValuesMiddleware(OCPPMiddleware):
     def handle(self, req: OCPPRequest) -> OCPPResponse:
         message = req.message
         transaction = message.transaction_from_data()

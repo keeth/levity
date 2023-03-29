@@ -4,7 +4,7 @@ from ocpp.services.ocpp.base import OCPPMiddleware, OCPPResponse, OCPPRequest
 from ocpp.types.registration_status import RegistrationStatus
 
 
-class BootNotificationHandler(OCPPMiddleware):
+class BootNotificationMiddleware(OCPPMiddleware):
     def handle(self, req: OCPPRequest) -> OCPPResponse:
         message = req.message
         charge_point = message.charge_point

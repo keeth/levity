@@ -6,7 +6,7 @@ from ocpp.types.authorization_status import AuthorizationStatus
 from ocpp.types.stop_reason import StopReason
 
 
-class StopTransactionHandler(OCPPMiddleware):
+class StopTransactionMiddleware(OCPPMiddleware):
     def handle(self, req: OCPPRequest) -> OCPPResponse:
         message = req.message
         transaction = message.transaction_from_data()

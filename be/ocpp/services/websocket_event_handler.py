@@ -7,6 +7,7 @@ from ocpp.models.charge_point import ChargePoint
 from ocpp.models.message import Message
 from ocpp.models.websocket_event import WebsocketEvent
 from ocpp.services.charge_point_service import ChargePointService
+from ocpp.services.ocpp_message_handler import OCPPMessageHandler
 from ocpp.types.actor_type import ActorType
 from ocpp.types.action import Action
 from ocpp.types.websocket_event_type import WebsocketEventType
@@ -46,7 +47,7 @@ class ReceiveHandler(WebsocketMessageHandler):
     def handle(self, charge_point: ChargePoint, message: dict):
         (message_type_id, unique_id, action, *rest) = message["message"]
 
-        Message.objects.create(
+        message = Message.objects.create(
             charge_point=charge_point,
             actor=ActorType.charge_point,
             action=Action(action),
@@ -54,6 +55,7 @@ class ReceiveHandler(WebsocketMessageHandler):
             message_type=message_type_id,
             data=rest[0] if rest else None,
         )
+        OCPPMessageHandler.handle_ocpp_message(message)
 
 
 WEBSOCKET_HANDLERS = {

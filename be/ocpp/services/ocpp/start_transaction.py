@@ -1,10 +1,9 @@
-from ocpp.models.message import Message
 from ocpp.models.transaction import Transaction
 from ocpp.services.ocpp.base import OCPPMiddleware, OCPPRequest, OCPPResponse
 from ocpp.types.authorization_status import AuthorizationStatus
 
 
-class StartTransactionHandler(OCPPMiddleware):
+class StartTransactionMiddleware(OCPPMiddleware):
     def handle(self, req: OCPPRequest) -> OCPPResponse:
         message = req.message
         transaction = Transaction.objects.create(
