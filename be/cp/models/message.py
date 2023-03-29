@@ -13,9 +13,18 @@ class Message(Timestamped):
     message_type = models.IntegerField()
     unique_id = models.CharField(max_length=128)
     actor = models.CharField(max_length=64, choices=ActorType.choices())
-    action = models.CharField(max_length=64, choices=Action.choices(), null=True)
+    action = models.CharField(
+        max_length=64, choices=Action.choices(), null=True, blank=True
+    )
     data = models.JSONField()
     reply = models.ForeignKey("cp.Message", on_delete=models.SET_NULL)
 
     class Meta:
         unique_together = ("actor", "unique_id")
+
+    def transaction_from_data(self):
+        transaction = Transaction.objects.get(id=self.data["transactionId"])
+        if not self.transaction:
+            self.transaction = transaction
+            self.save(update_fields=["transaction"])
+        return transaction

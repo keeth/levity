@@ -9,7 +9,9 @@ OCPP_HANDLERS = {}
 
 
 @receiver(post_save, sender=Message)
-def handle_ocpp_message(instance: Message, *args, **kwargs):
+def handle_ocpp_message(instance: Message, created, *args, **kwargs):
+    if not created:
+        return
     if ActorType(instance.actor) != ActorType.charge_point:
         return
     if MessageType(instance.message_type) != MessageType.call:

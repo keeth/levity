@@ -10,7 +10,10 @@ class StartTransactionHandler(OCPPMessageHandler):
             charge_point=message.charge_point,
             connector_id=message.data["connectorId"],
             id_tag=message.data["idTag"],
+            meter_start=message.data["meterStart"],
         )
+        message.transaction = transaction
+        message.save(update_fields=["transaction"])
         return self._reply(
             message,
             dict(

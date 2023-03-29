@@ -7,10 +7,10 @@ from cp.utils.model.timestamped import Timestamped
 class ChargePoint(Timestamped):
     id = models.CharField(max_length=128, primary_key=True)
     status = models.CharField(
-        max_length=64, choices=ChargePointStatus.choices(), default="", blank=True
+        max_length=64, choices=ChargePointStatus.choices(), null=True, blank=True
     )
     error_code = models.CharField(
-        max_length=64, choices=ChargePointStatus.choices(), default="", blank=True
+        max_length=64, choices=ChargePointStatus.choices(), null=True, blank=True
     )
     vendor_error_code = models.CharField(max_length=64, default="", blank=True)
     vendor_status_info = models.CharField(max_length=64, default="", blank=True)
