@@ -37,7 +37,7 @@ class ResponseMiddleware:
 
 
 class OCPPMiddleware(abc.ABC):
-    def __int__(self, next_middleware):
+    def __init__(self, next_middleware):
         self.next = next_middleware
 
     @abc.abstractmethod

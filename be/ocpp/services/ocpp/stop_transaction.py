@@ -15,9 +15,14 @@ class StopTransactionMiddleware(OCPPMiddleware):
         transaction.stopped_at = timezone.now()
         transaction.save(update_fields=["meter_stop", "stop_reason", "stopped_at"])
         transaction_data = message.data.get("transactionData") or []
-        for value in transaction_data:
-            MeterValue.create_from_json(transaction, value)
-
+        for meter_value in transaction_data:
+            for sampled_value in meter_value["sampledValue"]:
+                MeterValue.create_from_json(
+                    transaction, meter_value["timestamp"], sampled_value, is_final=True
+                )
+        charge_point = message.charge_point
+        charge_point.last_tx_stop_at = timezone.now()
+        charge_point.save(update_fields=["last_tx_stop_at"])
         res = self.next.handle(req)
         res.message.data.update(
             dict(idTagInfo=dict(status=AuthorizationStatus.Accepted)),

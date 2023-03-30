@@ -1,3 +1,5 @@
+from django.utils import timezone
+
 from ocpp.models.transaction import Transaction
 from ocpp.services.ocpp.base import OCPPMiddleware, OCPPRequest, OCPPResponse
 from ocpp.types.authorization_status import AuthorizationStatus
@@ -14,6 +16,9 @@ class StartTransactionMiddleware(OCPPMiddleware):
         )
         message.transaction = transaction
         message.save(update_fields=["transaction"])
+        charge_point = message.charge_point
+        charge_point.last_tx_stop_at = timezone.now()
+        charge_point.save(update_fields=["last_tx_start_at"])
         res = self.next.handle(req)
         res.message.data.update(
             dict(

@@ -8,6 +8,3 @@ class WebsocketEvent(models.Model):
     charge_point = models.ForeignKey(ChargePoint, null=True, on_delete=models.CASCADE)
     type = models.CharField(max_length=64, choices=WebsocketEventType.choices())
     timestamp = models.DateTimeField()
-
-    class Meta:
-        unique_together = ("actor", "unique_id")

@@ -9,6 +9,7 @@ class StopReason(ModelEnum):
     Other = "Other"
     PowerLoss = "PowerLoss"
     Reboot = "Reboot"
+    Remote = "Remote"
     SoftReset = "SoftReset"
     UnlockCommand = "UnlockCommand"
     DeAuthorized = "DeAuthorized"

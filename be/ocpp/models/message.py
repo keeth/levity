@@ -17,7 +17,7 @@ class Message(Timestamped):
         max_length=64, choices=Action.choices(), null=True, blank=True
     )
     data = models.JSONField()
-    reply = models.ForeignKey("ocpp.Message", on_delete=models.SET_NULL)
+    reply = models.ForeignKey("ocpp.Message", null=True, on_delete=models.SET_NULL)
 
     class Meta:
         unique_together = ("actor", "unique_id")
@@ -28,3 +28,13 @@ class Message(Timestamped):
             self.transaction = transaction
             self.save(update_fields=["transaction"])
         return transaction
+
+    def to_ocpp(self):
+        return dict(
+            id=self.charge_point.id,
+            message=[
+                int(self.message_type),
+                self.unique_id,
+                self.data,
+            ],
+        )

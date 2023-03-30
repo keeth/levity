@@ -21,13 +21,17 @@ class QueueConsumer:
                 channel.basic_qos(prefetch_count=1)
 
                 def _callback(channel, method_frame, header_frame, body):
-                    fn(json.loads(body))
+                    try:
+                        fn(json.loads(body))
+                    except Exception:
+                        # TODO: identify cases where we might want to nack the message and have it re-deliver
+                        logger.exception("AMQP MESSAGE")
                     channel.basic_ack(delivery_tag=method_frame.delivery_tag)
 
                 channel.basic_consume(queue, _callback)
                 channel.start_consuming()
             except pika.exceptions.AMQPChannelError as e:
-                logger.exception("AMQP CONSUMER ERROR")
+                logger.exception("AMQP CONSUMER")
                 break
             except (
                 pika.exceptions.ConnectionClosedByBroker,

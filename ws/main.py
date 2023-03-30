@@ -3,18 +3,20 @@ import json
 import logging
 import os
 from asyncio import Event
-from typing import Optional
+from typing import Optional, Dict
 
 import aio_pika
 from aio_pika import Message
 from aio_pika.abc import (
     AbstractRobustChannel,
+    AbstractRobustQueue,
 )
 from dotenv import load_dotenv
 from starlette.applications import Starlette
 from starlette.endpoints import WebSocketEndpoint
 from starlette.responses import JSONResponse
 from starlette.routing import Route, WebSocketRoute
+from starlette.websockets import WebSocket
 from uvicorn import Config, Server
 
 from util import cancellable_iterator
@@ -33,7 +35,7 @@ AMQP_URL = os.getenv("AMQP_URL", "amqp://127.0.0.1/")
 RPC_QUEUE = "rpc"
 CHARGE_POINT_ID = "charge_point_id"
 
-clients = {}
+clients: Dict[str, WebSocket] = {}
 
 
 async def health(request):
@@ -42,6 +44,7 @@ async def health(request):
 
 cancellation_event: Optional[Event] = None
 amqp_channel: Optional[AbstractRobustChannel] = None
+reply_queue: Optional[AbstractRobustQueue] = None
 
 
 class MainWebsocket(WebSocketEndpoint):
@@ -49,18 +52,23 @@ class MainWebsocket(WebSocketEndpoint):
 
     async def _rpc_send(self, msg):
         rpc_message = Message(
-            json.dumps(dict(type="message", message=msg)).encode(),
+            json.dumps(msg).encode(),
         )
         await amqp_channel.default_exchange.publish(rpc_message, RPC_QUEUE)
 
-    async def on_receive(self, websocket, ws_message):
+    async def on_receive(self, websocket: WebSocket, ws_message):
         charge_point_id = websocket.path_params[CHARGE_POINT_ID]
         logger.debug("WS RECEIVE %s %s", charge_point_id, ws_message)
         await self._rpc_send(
-            dict(type="receive", id=charge_point_id, message=ws_message)
+            dict(
+                type="receive",
+                id=charge_point_id,
+                message=ws_message,
+                queue=reply_queue.name,
+            )
         )
 
-    async def on_connect(self, websocket):
+    async def on_connect(self, websocket: WebSocket):
         charge_point_id = websocket.path_params[CHARGE_POINT_ID]
 
         logger.info(
@@ -77,25 +85,30 @@ class MainWebsocket(WebSocketEndpoint):
                 charge_point_id,
                 clients[charge_point_id]["ws"].client.host,
             )
-        clients[charge_point_id] = dict(ws=websocket, id=charge_point_id)
-        await self._rpc_send(dict(type="connect", id=charge_point_id))
+        clients[charge_point_id] = websocket
+        await self._rpc_send(
+            dict(type="connect", id=charge_point_id, queue=reply_queue.name)
+        )
 
-    async def on_disconnect(self, websocket, close_code):
+    async def on_disconnect(self, websocket: WebSocket, close_code):
         charge_point_id = websocket.path_params[CHARGE_POINT_ID]
         del clients[charge_point_id]
         logger.info("WS DISCONNECT %s %s", id(websocket), charge_point_id)
-        await self._rpc_send(dict(type="disconnect", id=charge_point_id))
+        await self._rpc_send(
+            dict(type="disconnect", id=charge_point_id, queue=reply_queue.name)
+        )
 
 
 async def setup_amqp():
     global amqp_channel
+    global reply_queue
 
     amqp_connection = await aio_pika.connect_robust(
         AMQP_URL,
     )
 
     async with amqp_connection:
-        logger.info("Enter AMQP loop")
+        logger.info("AMQP START")
         amqp_channel = await amqp_connection.channel()
         await amqp_channel.set_qos(prefetch_count=1)
         await amqp_channel.declare_queue(RPC_QUEUE)
@@ -104,9 +117,17 @@ async def setup_amqp():
         async with reply_queue.iterator() as queue_iter:
             async for message in cancellable_iterator(queue_iter, cancellation_event):
                 async with message.process():
-                    logger.info("AMQP receive %s", message.body)
+                    body = message.body.decode()
+                    logger.info("AMQP RECV %s", body)
+                    decoded = json.loads(body)
+                    charge_point_id = decoded["id"]
+                    charge_point_message = decoded["message"]
+                    if charge_point_id not in clients:
+                        logger.warning("SEND ERR (disconnected): %s", charge_point_id)
+                        continue
+                    await clients[charge_point_id].send_json(charge_point_message)
 
-    logger.info("Exit AMQP loop")
+    logger.info("AMQP STOP")
 
 
 class GracefulShutdownServer(Server):

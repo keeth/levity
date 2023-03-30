@@ -1,4 +1,5 @@
 import abc
+import json
 import logging
 
 from django.utils import timezone
@@ -24,6 +25,7 @@ class WebsocketMessageHandler(abc.ABC):
 class ConnectHandler(WebsocketMessageHandler):
     def handle(self, charge_point: ChargePoint, message: dict):
         charge_point.is_connected = True
+        charge_point.last_connect_at = timezone.now()
         charge_point.save(update_fields=["is_connected"])
         WebsocketEvent.objects.create(
             charge_point=charge_point,
@@ -68,7 +70,9 @@ WEBSOCKET_HANDLERS = {
 class WebsocketEventHandler:
     @classmethod
     def handle_websocket_event(cls, event: dict):
-        logger.info("RECV %s", event)
-        charge_point = ChargePointService.get_or_create_charge_point(event["id"])
+        logger.info("RECV %s", json.dumps(event))
+        charge_point = ChargePointService.update_or_create_charge_point(
+            event["id"], ws_queue=event["queue"]
+        )
         event_type = WebsocketEventType(event["type"])
         WEBSOCKET_HANDLERS[event_type].handle(charge_point, event)

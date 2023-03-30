@@ -18,16 +18,18 @@ class MeterValue(models.Model):
     is_final = models.BooleanField(default=False)
 
     @staticmethod
-    def create_from_json(transaction: Transaction, value: dict):
-        sample = value["sampledValue"]
+    def create_from_json(
+        transaction: Transaction, timestamp: str, sample: dict, is_final=False
+    ):
         return MeterValue.objects.create(
-            timestamp=dateutil.parser.isoparse(value["timestamp"]),
+            timestamp=dateutil.parser.isoparse(timestamp),
             transaction=transaction,
-            context=sample.get("context"),
-            format=sample.get("format"),
-            location=sample.get("location"),
-            phase=sample.get("phase"),
-            measurand=sample.get("measurand"),
-            unit=sample.get("unit"),
             value=sample.get("value"),
+            measurand=sample.get("measurand") or "Energy.Active.Import.Register",
+            unit=sample.get("unit") or "Wh",
+            context=sample.get("context") or "Sample.Periodic",
+            format=sample.get("format") or "Raw",
+            location=sample.get("location") or "Outlet",
+            phase=sample.get("phase") or "",
+            is_final=is_final,
         )
