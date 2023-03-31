@@ -1,6 +1,6 @@
 import abc
 import dataclasses
-from typing import Optional
+from typing import Optional, List
 
 from ocpp.models.message import Message
 from ocpp.models.transaction import Transaction
@@ -18,6 +18,7 @@ class OCPPRequest:
 class OCPPResponse:
     message: Message
     transaction: Optional[Transaction]
+    side_effects: List[Message]
     extra: dict
 
 
@@ -32,6 +33,7 @@ class ResponseMiddleware:
                 data={},
             ),
             transaction=None,
+            side_effects=[],
             extra={},
         )
 
