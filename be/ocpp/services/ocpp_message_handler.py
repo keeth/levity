@@ -45,12 +45,13 @@ class OCPPMessageHandler:
         assert (
             ActorType(message.actor) == ActorType.charge_point
         ), "Expected message from charge point"
-        action = Action(message.action)
         message_type = MessageType(message.message_type)
         if message_type == MessageType.call:
+            action = Action(message.action)
             custom_middleware_config = load_ocpp_middleware()
             middleware_classes = custom_middleware_config.get(
-                action, DEFAULT_MIDDLEWARE_CONFIG.get((action, message_type), [])
+                (action, message_type),
+                DEFAULT_MIDDLEWARE_CONFIG.get((action, message_type), []),
             )
             middleware = get_middleware(tuple(middleware_classes))
             res = middleware.handle(OCPPRequest(message=message, extra={}))
@@ -70,9 +71,13 @@ class OCPPMessageHandler:
                 )
         elif message_type == MessageType.call_result:
             # just link the call_result to the original call
-            Message.objects.filter(
+            originating_call = Message.objects.get(
                 unique_id=message.unique_id, message_type=MessageType.call
-            ).update(reply=message)
+            )
+            originating_call.reply = message
+            originating_call.save(update_fields=["reply"])
+            message.action = originating_call.action
+            message.save(update_fields=["action"])
 
 
 # [2,"03.00003282cfc304e65","BootNotification",{"chargePointSerialNumber":"GRS-03.00003282c","chargePointModel":"GRS-*","chargePointVendor":"United Chargers","firmwareVersion":"05.653:GCW-10.17-05.3:7452:B29A","meterType":"SW","iccid":"-87","imsi":"1"}]
@@ -87,4 +92,6 @@ class OCPPMessageHandler:
 
 # [2,"03.00003282c1dc63c95","StopTransaction",{"idTag":"hvresident","timestamp":"2023-03-29T20:05:06.001Z","transactionId":1,"meterStop":40330,"reason":"Remote","transactionData":[{"timestamp":"2023-03-29T20:05:06.001Z","sampledValue":[{"measurand":"Current.Import","unit":"A","value":"39.35"},{"measurand":"Power.Active.Import","unit":"W","value":"9141.55"},{"measurand":"Energy.Active.Import.Register","unit":"Wh","value":"40330.10"}]}]}]
 
-# [2,"03.00003282c0eb8ce0d","StatusNotification",{"errorCode":"NoError","status":"Preparing","timestamp":"2023-03-30T01:58:48.001Z","info":"Pilot and Charger:20h","vendorId":"UC","vendorErrorCode":"0","connectorId":1}]
+# [2,"03.00003282c0eb8ce0e","StatusNotification",{"errorCode":"NoError","status":"Preparing","timestamp":"2023-03-30T01:58:48.001Z","info":"Pilot and Charger:20h","vendorId":"UC","vendorErrorCode":"0","connectorId":1}]
+
+# [3,"4aecd659-8650-4d2c-a755-07952a5558a5",{"status":"Accepted"}]

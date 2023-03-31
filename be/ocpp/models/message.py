@@ -62,3 +62,32 @@ class Message(Timestamped):
             raise ValueError("Unknown message type {}".format(self.message_type))
 
         return dict(id=self.charge_point.id, message=ocpp_message)
+
+    @staticmethod
+    def from_occp(charge_point: ChargePoint, ocpp_message: dict):
+        message_type = MessageType(ocpp_message["message"][0])
+
+        action = None
+        error_code = None
+        error_description = None
+        if message_type == MessageType.call:
+            (_, unique_id, action, *rest) = ocpp_message["message"]
+        elif message_type == MessageType.call_result:
+            (_, unique_id, *rest) = ocpp_message["message"]
+        elif message_type == MessageType.call_error:
+            (_, unique_id, error_code, error_description, *rest) = ocpp_message[
+                "message"
+            ]
+        else:
+            raise ValueError("Unknown message type {}".format(message_type))
+
+        return Message.objects.create(
+            charge_point=charge_point,
+            message_type=message_type,
+            unique_id=unique_id,
+            actor=ActorType.charge_point,
+            action=Action(action) if action else None,
+            error_code=ErrorCode(error_code) if error_code else None,
+            error_description=error_description,
+            data=rest[0] if rest else None,
+        )

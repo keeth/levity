@@ -11,19 +11,20 @@ from ocpp.services.charge_point_service import ChargePointService
 from ocpp.services.ocpp_message_handler import OCPPMessageHandler
 from ocpp.types.actor_type import ActorType
 from ocpp.types.action import Action
+from ocpp.types.message_type import MessageType
 from ocpp.types.websocket_event_type import WebsocketEventType
 
 logger = logging.getLogger(__name__)
 
 
-class WebsocketMessageHandler(abc.ABC):
+class WebsocketEventHandler(abc.ABC):
     @abc.abstractmethod
-    def handle(self, charge_point: ChargePoint, message: dict):
+    def handle(self, charge_point: ChargePoint, event: dict):
         pass
 
 
-class ConnectHandler(WebsocketMessageHandler):
-    def handle(self, charge_point: ChargePoint, message: dict):
+class ConnectHandler(WebsocketEventHandler):
+    def handle(self, charge_point: ChargePoint, event: dict):
         charge_point.is_connected = True
         charge_point.last_connect_at = timezone.now()
         charge_point.save(update_fields=["is_connected"])
@@ -34,8 +35,8 @@ class ConnectHandler(WebsocketMessageHandler):
         )
 
 
-class DisconnectHandler(WebsocketMessageHandler):
-    def handle(self, charge_point: ChargePoint, message: dict):
+class DisconnectHandler(WebsocketEventHandler):
+    def handle(self, charge_point: ChargePoint, event: dict):
         charge_point.is_connected = False
         charge_point.save(update_fields=["is_connected"])
         WebsocketEvent.objects.create(
@@ -45,18 +46,9 @@ class DisconnectHandler(WebsocketMessageHandler):
         )
 
 
-class ReceiveHandler(WebsocketMessageHandler):
-    def handle(self, charge_point: ChargePoint, message: dict):
-        (message_type_id, unique_id, action, *rest) = message["message"]
-
-        message = Message.objects.create(
-            charge_point=charge_point,
-            actor=ActorType.charge_point,
-            action=Action(action),
-            unique_id=unique_id,
-            message_type=message_type_id,
-            data=rest[0] if rest else None,
-        )
+class ReceiveHandler(WebsocketEventHandler):
+    def handle(self, charge_point: ChargePoint, event: dict):
+        message = Message.from_occp(charge_point, event)
         OCPPMessageHandler.handle_ocpp_message(message)
 
 

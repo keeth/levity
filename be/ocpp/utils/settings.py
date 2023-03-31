@@ -6,6 +6,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.utils.module_loading import import_string
 
 from ocpp.types.action import Action
+from ocpp.types.message_type import MessageType
 
 
 def _import_classes(class_names: List[str]):
@@ -31,9 +32,23 @@ def _action(action_name: str):
         )
 
 
+def _message_type(message_type_id):
+    try:
+        return MessageType(message_type_id)
+    except ValueError:
+        raise ImproperlyConfigured(
+            "Unknown message type {}. Check your OCPP_MIDDLEWARE setting.".format(
+                message_type_id
+            )
+        )
+
+
 @lru_cache
 def _load_ocpp_middleware_from_dict(setting: dict):
-    return {_action(k): _import_classes(v) for k, v in setting.items()}
+    return {
+        (_action(k[0]), _message_type(k[1])): _import_classes(v)
+        for k, v in setting.items()
+    }
 
 
 def load_ocpp_middleware():
