@@ -5,26 +5,26 @@ from typing import AsyncIterator
 
 logger = logging.getLogger(__name__)
 
+
 async def cancellable_iterator(
-        async_iterator: AsyncIterator,
-        cancellation_event: Event
+    async_iterator: AsyncIterator, cancellation_event: Event
 ) -> AsyncIterator:
     """Wrap an async iterator such that it exits when the cancellation event is
     set.
     """
     cancellation_task = asyncio.create_task(cancellation_event.wait())
     result_iter = async_iterator.__aiter__()
+    iter_next_task = asyncio.create_task(result_iter.__anext__())
     while not cancellation_event.is_set():
         done, pending = await asyncio.wait(
-            [cancellation_task, result_iter.__anext__()],
-            return_when=asyncio.FIRST_COMPLETED
+            [cancellation_task, iter_next_task], return_when=asyncio.FIRST_COMPLETED
         )
         for done_task in done:
             if done_task != cancellation_task:
                 # We have a result from the async iterator.
                 yield done_task.result()
             else:
-                logger.info('Cancellation detected')
+                logger.info("Cancellation detected")
                 # The cancellation token has been set, and we should exit.
                 # Cancel any pending tasks. This is safe as there is no await
                 # between the completion of the wait on the cancellation event

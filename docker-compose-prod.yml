@@ -1,0 +1,73 @@
+version: "3.9"
+services:
+  fe:
+    image: keeth/levity-fe
+    ports:
+      - "80:80"
+    depends_on:
+      - be
+      - ws
+
+  be:
+    image: keeth/levity-be
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgres://levity:levity@postgres/levity
+      AMQP_URL: amqp://guest:guest@rabbitmq:5672/%2F?connection_attempts=20&retry_delay=1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  be_rpc:
+    image: keeth/levity-be
+    environment:
+      DATABASE_URL: postgres://levity:levity@postgres/levity
+      AMQP_URL: amqp://guest:guest@rabbitmq:5672/%2F?connection_attempts=20&retry_delay=1
+    command: poetry run python manage.py consume_rpc_queue
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  ws:
+    image: keeth/levity-ws
+    ports:
+      - "3000:3000"
+    environment:
+      AMQP_URL: amqp://guest:guest@rabbitmq:5672/%2F?connection_attempts=20&retry_delay=1
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: levity
+      POSTGRES_DB: levity
+      POSTGRES_PASSWORD: levity
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready
+
+
+  rabbitmq:
+    image: rabbitmq:3-alpine
+    ports:
+      - '5672:5672'
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
+
