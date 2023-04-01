@@ -23,7 +23,7 @@ class ConnectHandler(WebsocketEventHandler):
     def handle(self, charge_point: ChargePoint, event: dict):
         charge_point.is_connected = True
         charge_point.last_connect_at = utc_now()
-        charge_point.save(update_fields=["is_connected"])
+        charge_point.save(update_fields=["is_connected", "last_connect_at"])
         WebsocketEvent.objects.create(
             charge_point=charge_point,
             timestamp=utc_now(),
