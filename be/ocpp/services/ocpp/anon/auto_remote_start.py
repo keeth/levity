@@ -10,7 +10,7 @@ from ocpp.types.message_type import MessageType
 
 class AutoRemoteStartMiddleware(OCPPMiddleware):
     """
-    When a charge point transitions to Preparing, automatically start a transaction
+    When a charge point transitions to Preparing, automatically start a transaction, using an anonymous ID tag
     """
 
     def handle(self, req: OCPPRequest) -> OCPPResponse:

@@ -6,6 +6,7 @@ from ocpp.utils.model.timestamped import Timestamped
 
 class ChargePoint(Timestamped):
     id = models.CharField(max_length=128, primary_key=True)
+    name = models.CharField(max_length=128, default="", blank=True)
     status = models.CharField(
         max_length=64, choices=ChargePointStatus.choices(), null=True, blank=True
     )
@@ -26,3 +27,6 @@ class ChargePoint(Timestamped):
     last_connect_at = models.DateTimeField(null=True)
     last_tx_start_at = models.DateTimeField(null=True)
     last_tx_stop_at = models.DateTimeField(null=True)
+
+    def __str__(self):
+        return "{} / {}".format(self.id, self.name)

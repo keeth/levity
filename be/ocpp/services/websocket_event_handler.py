@@ -2,17 +2,13 @@ import abc
 import json
 import logging
 
-from django.utils import timezone
-
 from ocpp.models.charge_point import ChargePoint
 from ocpp.models.message import Message
 from ocpp.models.websocket_event import WebsocketEvent
+from ocpp.services.charge_point_message_handler import ChargePointMessageHandler
 from ocpp.services.charge_point_service import ChargePointService
-from ocpp.services.ocpp_message_handler import OCPPMessageHandler
-from ocpp.types.actor_type import ActorType
-from ocpp.types.action import Action
-from ocpp.types.message_type import MessageType
 from ocpp.types.websocket_event_type import WebsocketEventType
+from ocpp.utils.date import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -26,11 +22,11 @@ class WebsocketEventHandler(abc.ABC):
 class ConnectHandler(WebsocketEventHandler):
     def handle(self, charge_point: ChargePoint, event: dict):
         charge_point.is_connected = True
-        charge_point.last_connect_at = timezone.now()
+        charge_point.last_connect_at = utc_now()
         charge_point.save(update_fields=["is_connected"])
         WebsocketEvent.objects.create(
             charge_point=charge_point,
-            timestamp=timezone.now(),
+            timestamp=utc_now(),
             type=WebsocketEventType.connect,
         )
 
@@ -41,7 +37,7 @@ class DisconnectHandler(WebsocketEventHandler):
         charge_point.save(update_fields=["is_connected"])
         WebsocketEvent.objects.create(
             charge_point=charge_point,
-            timestamp=timezone.now(),
+            timestamp=utc_now(),
             type=WebsocketEventType.disconnect,
         )
 
@@ -49,7 +45,7 @@ class DisconnectHandler(WebsocketEventHandler):
 class ReceiveHandler(WebsocketEventHandler):
     def handle(self, charge_point: ChargePoint, event: dict):
         message = Message.from_occp(charge_point, event)
-        OCPPMessageHandler.handle_ocpp_message(message)
+        ChargePointMessageHandler.handle_message_from_charge_point(message)
 
 
 WEBSOCKET_HANDLERS = {
