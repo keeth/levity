@@ -5,7 +5,15 @@ from ocpp.models.message import Message
 from ocpp.services.charge_point_service import ChargePointService
 from ocpp.services.ocpp.anon.auto_remote_start import AutoRemoteStartMiddleware
 from ocpp.services.ocpp.base import ResponseMiddleware, OCPPRequest
+from ocpp.services.ocpp.core.authorize import AuthorizeMiddleware
 from ocpp.services.ocpp.core.boot_notification import BootNotificationMiddleware
+from ocpp.services.ocpp.core.data_transfer import DataTransferMiddleware
+from ocpp.services.ocpp.core.diagnostics_status_notification import (
+    DiagnosticsStatusNotificationMiddleware,
+)
+from ocpp.services.ocpp.core.firmware_status_notification import (
+    FirmwareStatusNotificationMiddleware,
+)
 from ocpp.services.ocpp.core.meter_values import MeterValuesMiddleware
 from ocpp.services.ocpp.core.start_transaction import StartTransactionMiddleware
 from ocpp.services.ocpp.core.status_notification import StatusNotificationMiddleware
@@ -17,7 +25,15 @@ from ocpp.utils.serialization import json_decode, json_encode
 from ocpp.utils.settings import load_ocpp_middleware
 
 DEFAULT_MIDDLEWARE_CONFIG = {
+    (Action.Authorize, MessageType.call): [AuthorizeMiddleware],
     (Action.BootNotification, MessageType.call): [BootNotificationMiddleware],
+    (Action.DataTransfer, MessageType.call): [DataTransferMiddleware],
+    (Action.DiagnosticsStatusNotification, MessageType.call): [
+        DiagnosticsStatusNotificationMiddleware
+    ],
+    (Action.FirmwareStatusNotification, MessageType.call): [
+        FirmwareStatusNotificationMiddleware
+    ],
     (Action.MeterValues, MessageType.call): [MeterValuesMiddleware],
     (Action.StartTransaction, MessageType.call): [StartTransactionMiddleware],
     (Action.StatusNotification, MessageType.call): [
