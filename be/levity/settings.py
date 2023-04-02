@@ -28,6 +28,9 @@ SECRET_KEY = "django-insecure-_1efc+w@z)z5y)!d%7)(=ea^0+hma466%u&4vm5*5$9b$^c28k
 DEBUG = True
 
 ALLOWED_HOSTS = []
+HOSTNAME = os.environ.get("HOSTNAME")
+if HOSTNAME:
+    ALLOWED_HOSTS.append(HOSTNAME)
 
 
 # Application definition
@@ -119,6 +122,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.1/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = "static"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field

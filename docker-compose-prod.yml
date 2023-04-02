@@ -7,6 +7,8 @@ services:
     depends_on:
       - be
       - ws
+    volumes:
+      - static_files:/var/www/html
 
   be:
     image: keeth/levity-be
@@ -15,11 +17,15 @@ services:
     environment:
       DATABASE_URL: postgres://levity:levity@postgres/levity
       AMQP_URL: amqp://guest:guest@rabbitmq:5672/%2F?connection_attempts=20&retry_delay=1
+      HOSTNAME: localhost
+    command: scripts/docker-start.sh
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    volumes:
+      - static_files:/var/www/html
 
   be_rpc:
     image: keeth/levity-be
@@ -70,4 +76,5 @@ services:
 volumes:
   postgres_data:
   rabbitmq_data:
+  static_files:
 
