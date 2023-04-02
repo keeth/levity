@@ -19,6 +19,7 @@ class QueueConsumer:
                 connection = pika.BlockingConnection(URLParameters(settings.AMQP_URL))
                 channel = connection.channel()
                 channel.basic_qos(prefetch_count=1)
+                channel.queue_declare(queue)
 
                 def _callback(channel, method_frame, header_frame, body):
                     try:
