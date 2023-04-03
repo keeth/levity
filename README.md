@@ -1,35 +1,43 @@
 # levity
 
-## Production server install (TLS, recommended)
+An extensible OCPP server and EVSE management platform.
 
-* Note: Your domain must already point to the server for LetsEncrypt to generate certs.
-* You can generate a secret key at https://djecrety.ir/
+## Full install (non-TLS)
 
 ```shell
-ssh user@myhost mkdir levity
-scp docker-compose-prod-tls.yml user@myhost:levity/docker-compose.yml
-ssh user@myhost
+mkdir levity
 cd levity
-vim docker-compose.yml # set HOSTNAME and SECRET_KEY environment vars on the `be` container to your domain
+curl https://raw.githubusercontent.com/keeth/levity/main/docker-compose.full.yml -o docker-compose.yml
+# For a local/debug install, you don't need to modify docker-compose.yml.
+# For a non-SSL server deployment, edit docker-compose.yml, 
+# setting DEBUG to false, HOSTNAME to your domain, SECRET_KEY to a unique secret value (see below)
+docker compose up -d
+docker exec -it levity-be-1 poetry run python manage.py migrate
+docker exec -it levity-be-1 poetry run python manage.py createsuperuser
+# Visit your server at port 80, go to /admin to log in as superuser
+```
+
+## Full install (TLS-enabled)
+
+* Note: Your domain must already resolve to the server IP address for LetsEncrypt to generate certs.
+
+```shell
+mkdir levity
+cd levity
+curl https://raw.githubusercontent.com/keeth/levity/main/docker-compose.full-tls.yml -o docker-compose.yml
+# Edit docker-compose.yml, setting DEBUG to false, HOSTNAME to your domain, SECRET_KEY to a unique secret value (see below)
 docker compose run --rm --entrypoint 'sh /usr/local/bin/write-nginx-conf.sh example.com' fe_tls
 docker compose run --rm --entrypoint 'sh /usr/local/bin/self-signed-cert.sh example.com' fe_tls
 docker compose up -d fe
 docker compose run --rm --entrypoint 'sh /usr/local/bin/lets-encrypt-cert.sh example.com email@example.com' fe_tls
 docker compose restart fe
 docker compose up -d
-```
-
-## Debug server install (non-TLS)
-
-```shell
-ssh user@myhost mkdir levity
-scp docker-compose-prod.yml user@myhost:levity/docker-compose.yml
-ssh user@myhost
-cd levity
-docker compose up -d
 docker exec -it levity-be-1 poetry run python manage.py migrate
 docker exec -it levity-be-1 poetry run python manage.py createsuperuser
+# Visit your server at port 80, go to /admin to log in as superuser
 ```
+
+* You can generate SECRET_KEY at https://djecrety.ir/
 
 ## Dev install
 
@@ -61,6 +69,7 @@ poetry install
 
 ```shell
 cd be/
+export DJANGO_SETTINGS_MODULE=levity.settings
 ./manage.py runserver &
 ./manage.py consume_rpc_queue &
 ```
