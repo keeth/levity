@@ -25,7 +25,7 @@ docker exec -it levity-be-1 poetry run python manage.py createsuperuser
 mkdir levity
 cd levity
 curl https://raw.githubusercontent.com/keeth/levity/main/docker-compose.full-tls.yml -o docker-compose.yml
-# Edit docker-compose.yml, setting DEBUG to false, HOSTNAME to your domain, SECRET_KEY to a unique secret value (see below)
+# Edit docker-compose.yml, setting HOSTNAME to your domain, SECRET_KEY to a unique secret value (see below)
 docker compose run --rm --entrypoint 'sh /usr/local/bin/write-nginx-conf.sh example.com' fe_tls
 docker compose run --rm --entrypoint 'sh /usr/local/bin/self-signed-cert.sh example.com' fe_tls
 docker compose up -d fe

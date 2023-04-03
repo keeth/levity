@@ -20,7 +20,7 @@ services:
       # For local/debug install, you can set DEBUG: true and comment out HOSTNAME and SECRET_KEY.
       # For a non-SSL server deployment, set DEBUG: false, HOSTNAME to your domain, and generate a SECRET_KEY.
       DEBUG: true
-      # HOSTNAME: localhost
+      # HOSTNAME: example.com
       # SECRET_KEY: changeme
     command: scripts/docker-start.sh
     depends_on:

@@ -31,7 +31,7 @@ services:
       DATABASE_URL: postgres://levity:levity@postgres/levity
       AMQP_URL: amqp://guest:guest@rabbitmq:5672/%2F?connection_attempts=20&retry_delay=1
       DEBUG: false
-      # For an SSL-enabled server deployment, set HOSTNAME to your domain, and generate a SECRET_KEY.
+      # Set HOSTNAME to your domain, and generate a SECRET_KEY.
       HOSTNAME: example.com
       SECRET_KEY: changeme
 
