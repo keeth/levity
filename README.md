@@ -37,6 +37,8 @@ docker exec -it levity-be-1 poetry run python manage.py createsuperuser
 # Visit your server at port 80, go to /admin to log in as superuser
 ```
 
+## Generating SECRET_KEY
+
 * You can generate SECRET_KEY at https://djecrety.ir/
 
 ## Dev install
