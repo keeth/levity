@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 
 import dj_database_url
+from django.conf.global_settings import CSRF_TRUSTED_ORIGINS
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -22,16 +23,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-_1efc+w@z)z5y)!d%7)(=ea^0+hma466%u&4vm5*5$9b$^c28k"
+SECRET_KEY = os.environ.get(
+    "SECRET_KEY",
+    "django-insecure-_1efc+w@z)z5y)!d%7)(=ea^0+hma466%u&4vm5*5$9b$^c28k",
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get("DEBUG", "true").lower() == "true"
 
 ALLOWED_HOSTS = []
-HOSTNAME = os.environ.get("HOSTNAME")
-if HOSTNAME:
+if not DEBUG:
+    HOSTNAME = os.environ.get("HOSTNAME")
     ALLOWED_HOSTS.append(HOSTNAME)
-
+    CSRF_TRUSTED_ORIGINS.append("https://{}".format(HOSTNAME))
 
 # Application definition
 

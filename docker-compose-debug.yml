@@ -1,27 +1,14 @@
 version: "3.9"
 services:
-  fe_tls:
-    image: keeth/levity-fe-tls
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
-    volumes:
-      - certbot_conf:/etc/letsencrypt
-      - certbot_www:/var/www/certbot
-      - nginx_conf:/etc/nginx/conf.d
-
   fe:
     image: keeth/levity-fe
     ports:
       - "80:80"
-      - "443:443"
     depends_on:
       - be
       - ws
     volumes:
       - static_files:/var/www/html
-      - certbot_conf:/etc/letsencrypt
-      - certbot_www:/var/www/certbot
-      - nginx_conf:/etc/nginx/conf.d
-    command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
 
   be:
     image: keeth/levity-be
@@ -30,11 +17,7 @@ services:
     environment:
       DATABASE_URL: postgres://levity:levity@postgres/levity
       AMQP_URL: amqp://guest:guest@rabbitmq:5672/%2F?connection_attempts=20&retry_delay=1
-      # SPECIFY YOUR DOMAIN AND SECRET KEY BELOW
-      HOSTNAME: example.com
-      DEBUG: false
-      SECRET_KEY: changeme
-
+      DEBUG: true
     command: scripts/docker-start.sh
     depends_on:
       postgres:
@@ -94,7 +77,4 @@ volumes:
   postgres_data:
   rabbitmq_data:
   static_files:
-  certbot_www:
-  certbot_conf:
-  nginx_conf:
 
