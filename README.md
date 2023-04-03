@@ -35,7 +35,7 @@ docker compose restart fe
 docker compose up -d
 docker compose run --rm be poetry run python manage.py migrate
 docker compose run --rm be poetry run python manage.py createsuperuser
-# Visit your server at port 80, go to /admin to log in as superuser
+# Visit your server at port 443, go to /admin to log in as superuser
 ```
 
 ## Generating SECRET_KEY
