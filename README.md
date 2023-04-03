@@ -4,6 +4,7 @@ An extensible OCPP server and EVSE management platform.
 
 ## Full install (non-TLS)
 
+
 ```shell
 mkdir levity
 cd levity
@@ -12,8 +13,8 @@ curl https://raw.githubusercontent.com/keeth/levity/main/docker-compose.full.yml
 # For a non-SSL server deployment, edit docker-compose.yml, 
 # setting DEBUG to false, HOSTNAME to your domain, SECRET_KEY to a unique secret value (see below)
 docker compose up -d
-docker exec -it levity-be-1 poetry run python manage.py migrate
-docker exec -it levity-be-1 poetry run python manage.py createsuperuser
+docker compose run --rm be poetry run python manage.py migrate
+docker compose run --rm be poetry run python manage.py createsuperuser
 # Visit your server at port 80, go to /admin to log in as superuser
 ```
 
@@ -32,8 +33,8 @@ docker compose up -d fe
 docker compose run --rm --entrypoint 'sh /usr/local/bin/lets-encrypt-cert.sh example.com email@example.com' fe_tls
 docker compose restart fe
 docker compose up -d
-docker exec -it levity-be-1 poetry run python manage.py migrate
-docker exec -it levity-be-1 poetry run python manage.py createsuperuser
+docker compose run --rm be poetry run python manage.py migrate
+docker compose run --rm be poetry run python manage.py createsuperuser
 # Visit your server at port 80, go to /admin to log in as superuser
 ```
 
