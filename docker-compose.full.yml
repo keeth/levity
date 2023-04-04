@@ -15,6 +15,7 @@ services:
     ports:
       - "8000:8000"
     environment:
+      TIME_ZONE: "UTC"
       DATABASE_URL: postgres://levity:levity@postgres/levity
       AMQP_URL: amqp://guest:guest@rabbitmq:5672/%2F?connection_attempts=20&retry_delay=1
       # For local/debug install, you can set DEBUG: true and comment out HOSTNAME and SECRET_KEY.
@@ -34,6 +35,7 @@ services:
   be_rpc:
     image: keeth/levity-be
     environment:
+      TIME_ZONE: "UTC"
       DATABASE_URL: postgres://levity:levity@postgres/levity
       AMQP_URL: amqp://guest:guest@rabbitmq:5672/%2F?connection_attempts=20&retry_delay=1
     command: poetry run python manage.py consume_rpc_queue
