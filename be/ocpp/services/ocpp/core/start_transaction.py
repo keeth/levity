@@ -12,6 +12,7 @@ class StartTransactionMiddleware(OCPPMiddleware):
             connector_id=message.data["connectorId"],
             id_tag=message.data["idTag"],
             meter_start=message.data["meterStart"],
+            started_at=utc_now(),
         )
         message.transaction = transaction
         message.save(update_fields=["transaction"])
