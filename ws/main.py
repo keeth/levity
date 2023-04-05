@@ -83,7 +83,7 @@ class MainWebsocket(WebSocketEndpoint):
             logger.warning(
                 "Charge point %s already connected from %s",
                 charge_point_id,
-                clients[charge_point_id]["ws"].client.host,
+                clients[charge_point_id].client.host,
             )
         clients[charge_point_id] = websocket
         await self._rpc_send(
