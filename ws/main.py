@@ -58,7 +58,11 @@ class MainWebsocket(WebSocketEndpoint):
 
     async def on_receive(self, websocket: WebSocket, ws_message):
         charge_point_id = websocket.path_params[CHARGE_POINT_ID]
-        logger.debug("WS RECEIVE %s %s", charge_point_id, ws_message)
+        logger.debug(
+            "WS RECEIVE %s MSG: %s",
+            dict(charge_point=charge_point_id, client=id(websocket)),
+            ws_message,
+        )
         await self._rpc_send(
             dict(
                 type="receive",
@@ -72,9 +76,12 @@ class MainWebsocket(WebSocketEndpoint):
         charge_point_id = websocket.path_params[CHARGE_POINT_ID]
 
         logger.info(
-            "WS CONNECT %s %s",
-            charge_point_id,
-            websocket.client.host,
+            "WS CONNECT %s",
+            dict(
+                charge_point=charge_point_id,
+                client=id(websocket),
+                host=websocket.client.host,
+            ),
         )
         await websocket.accept(
             subprotocol=websocket.headers.get("sec-websocket-protocol")
@@ -92,8 +99,15 @@ class MainWebsocket(WebSocketEndpoint):
 
     async def on_disconnect(self, websocket: WebSocket, close_code):
         charge_point_id = websocket.path_params[CHARGE_POINT_ID]
-        del clients[charge_point_id]
-        logger.info("WS DISCONNECT %s %s", id(websocket), charge_point_id)
+        client = clients.pop(charge_point_id, None)
+        if not client:
+            logger.warning(
+                "Charge point %s on_disconnect: connection not found",
+                charge_point_id,
+            )
+        logger.info(
+            "WS DISCONNECT %s", dict(charge_point=charge_point_id, client=id(websocket))
+        )
         await self._rpc_send(
             dict(type="disconnect", id=charge_point_id, queue=reply_queue.name)
         )
@@ -143,7 +157,13 @@ routes = [
 ]
 
 app = Starlette(debug=True, routes=routes)
-config = Config(app, host=HOST, port=PORT, loop="asyncio")
+config = Config(
+    app,
+    host=HOST,
+    port=PORT,
+    loop="asyncio",
+    ws_ping_interval=None,  # Grizzl-e doesn't handle pings well
+)
 
 ws_server = GracefulShutdownServer(config=config)
 
