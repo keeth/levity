@@ -63,6 +63,13 @@ class MainWebsocket(WebSocketEndpoint):
             dict(charge_point=charge_point_id, client=id(websocket)),
             ws_message,
         )
+        if charge_point_id not in clients:
+            logger.warning(
+                "Charge point %s was missing from clients (fixed)",
+                charge_point_id,
+            )
+            clients[charge_point_id] = websocket
+
         await self._rpc_send(
             dict(
                 type="receive",
