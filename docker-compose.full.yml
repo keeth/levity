@@ -78,9 +78,16 @@ services:
     healthcheck:
       test: rabbitmq-diagnostics -q ping
 
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - '9090:9090'
+    volumes:
+      - prometheus_data:/prometheus
 
 volumes:
   postgres_data:
   rabbitmq_data:
   static_files:
+  prometheus_data:
 
