@@ -14,6 +14,7 @@ from ocpp.services.ocpp.core.diagnostics_status_notification import (
 from ocpp.services.ocpp.core.firmware_status_notification import (
     FirmwareStatusNotificationMiddleware,
 )
+from ocpp.services.ocpp.core.heartbeat import HeartbeatMiddleware
 from ocpp.services.ocpp.core.meter_values import MeterValuesMiddleware
 from ocpp.services.ocpp.core.start_transaction import StartTransactionMiddleware
 from ocpp.services.ocpp.core.status_notification import StatusNotificationMiddleware
@@ -34,6 +35,7 @@ DEFAULT_MIDDLEWARE_CONFIG = {
     (Action.FirmwareStatusNotification, MessageType.call): [
         FirmwareStatusNotificationMiddleware
     ],
+    (Action.Heartbeat, MessageType.call): [HeartbeatMiddleware],
     (Action.MeterValues, MessageType.call): [MeterValuesMiddleware],
     (Action.StartTransaction, MessageType.call): [StartTransactionMiddleware],
     (Action.StatusNotification, MessageType.call): [
