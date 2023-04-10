@@ -1,11 +1,12 @@
 FROM python:3-alpine
 ENV DJANGO_SETTINGS_MODULE levity.settings
+ARG POETRY_ARGS
 WORKDIR /app
 COPY poetry.lock .
 COPY pyproject.toml .
 RUN apk --no-cache add libpq && \
     pip install poetry && \
-    poetry install --no-root && \
+    poetry install --no-root $POETRY_ARGS && \
     rm -rf ~/.cache/pip && \
     rm -rf ~/.cache/pypoetry/{cache,artifacts} && \
     find ~/.cache/pypoetry/virtualenvs -name '*.pyc' -exec rm -rf '{}' \;

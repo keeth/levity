@@ -1,0 +1,36 @@
+version: "3.9"
+services:
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: levity
+      POSTGRES_DB: levity
+      POSTGRES_PASSWORD: levity
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}" ]
+  rabbitmq:
+    image: rabbitmq:3-alpine
+    ports:
+      - '5672:5672'
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+
+  be_test:
+    build:
+      context: ./be
+      dockerfile: Dockerfile
+      args:
+        POETRY_ARGS: --with dev
+    environment:
+      TIME_ZONE: "UTC"
+      DATABASE_URL: postgres://levity:levity@postgres/levity
+      AMQP_URL: amqp://guest:guest@rabbitmq:5672/%2F?connection_attempts=20&retry_delay=1
+      DEBUG: true
+    command: poetry run pytest
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy

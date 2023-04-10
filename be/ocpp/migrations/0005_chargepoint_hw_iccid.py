@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("ocpp", "0004_remove_transaction_remote_started_at_and_more"),
     ]

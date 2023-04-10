@@ -1,0 +1,20 @@
+name: fable-backend-tests
+on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Test
+        id: test
+        run: docker compose -f docker-compose.test.yml run -T --rm be_test
+      - name: Print docker logs
+        run: docker compose logs
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: psf/black@stable
+        with:
+          version: "23.3.0"
