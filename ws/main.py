@@ -69,6 +69,9 @@ class MainWebsocket(WebSocketEndpoint):
                 charge_point_id,
             )
             clients[charge_point_id] = websocket
+            await self._rpc_send(
+                dict(type="connect", id=charge_point_id, queue=reply_queue.name)
+            )
 
         await self._rpc_send(
             dict(
