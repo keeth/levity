@@ -11,6 +11,8 @@ class BootNotificationMiddleware(OCPPMiddleware):
         charge_point.hw_model = message.data.get("chargePointModel", "")
         charge_point.hw_vendor = message.data.get("chargePointVendor", "")
         charge_point.hw_serial = message.data.get("chargePointSerialNumber", "")
+        charge_point.hw_iccid = message.data.get("iccid", "")
+        charge_point.hw_imsi = message.data.get("imsi", "")
         charge_point.last_boot_at = utc_now()
         charge_point.save(
             update_fields=[
@@ -19,6 +21,8 @@ class BootNotificationMiddleware(OCPPMiddleware):
                 "hw_vendor",
                 "hw_serial",
                 "last_boot_at",
+                "hw_iccid",
+                "hw_imsi",
             ]
         )
         res = self.next.handle(req)

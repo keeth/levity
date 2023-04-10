@@ -22,6 +22,8 @@ class ChargePoint(Timestamped):
     hw_model = models.CharField(max_length=256, default="", blank=True)
     hw_serial = models.CharField(max_length=256, default="", blank=True)
     hw_firmware = models.CharField(max_length=256, default="", blank=True)
+    hw_iccid = models.CharField(max_length=256, default="", blank=True)
+    hw_imsi = models.CharField(max_length=256, default="", blank=True)
     last_heartbeat_at = models.DateTimeField(null=True)
     last_boot_at = models.DateTimeField(null=True)
     last_connect_at = models.DateTimeField(null=True)
