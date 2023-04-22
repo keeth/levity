@@ -7,20 +7,22 @@ logger = logging.getLogger(__name__)
 
 
 async def cancellable_iterator(
-    async_iterator: AsyncIterator, cancellation_event: Event
+    async_iterator: AsyncIterator, *cancellation_events: Event
 ) -> AsyncIterator:
     """Wrap an async iterator such that it exits when the cancellation event is
     set.
     """
-    cancellation_task = asyncio.create_task(cancellation_event.wait())
+    cancellation_tasks = [
+        asyncio.create_task(event.wait()) for event in cancellation_events
+    ]
     result_iter = async_iterator.__aiter__()
-    while not cancellation_event.is_set():
+    while not any([event.is_set() for event in cancellation_events]):
         iter_next_task = asyncio.create_task(result_iter.__anext__())
         done, pending = await asyncio.wait(
-            [cancellation_task, iter_next_task], return_when=asyncio.FIRST_COMPLETED
+            [*cancellation_tasks, iter_next_task], return_when=asyncio.FIRST_COMPLETED
         )
         for done_task in done:
-            if done_task != cancellation_task:
+            if done_task not in cancellation_tasks:
                 # We have a result from the async iterator.
                 yield done_task.result()
             else:

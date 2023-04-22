@@ -137,3 +137,5 @@ AMQP_URL = os.environ.get(
     "AMQP_URL",
     "amqp://guest:guest@localhost:5672/%2F?connection_attempts=20&retry_delay=1",
 )
+
+OCPP_HEARTBEAT_INTERVAL = 3600

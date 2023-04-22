@@ -10,3 +10,5 @@ class OcppConfig(AppConfig):
         from ocpp.utils.settings import load_ocpp_middleware
 
         load_ocpp_middleware()
+
+        import ocpp.receivers  # noqa: F401
