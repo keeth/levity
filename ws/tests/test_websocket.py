@@ -47,5 +47,4 @@ async def test_app(caplog):
                 data = json.loads(message.body.decode())
             assert data["type"] == "disconnect"
             assert data["id"] == "1234"
-
     shutdown_event.set()

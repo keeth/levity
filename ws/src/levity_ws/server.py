@@ -24,7 +24,6 @@ class MainWebsocket(WebSocketEndpoint):
     encoding = "json"
 
     async def _rpc_send(self, msg: dict):
-        print("ws rpc_send_queue", ctx.rpc_send_queue)
         msg["queue"] = ctx.rpc_recv_queue.name
         rpc_message = Message(
             json.dumps(msg).encode(),
@@ -34,7 +33,6 @@ class MainWebsocket(WebSocketEndpoint):
         )
 
     async def on_receive(self, websocket: WebSocket, ws_message):
-        print("on_receive", websocket)
         charge_point_id = websocket.path_params[CHARGE_POINT_ID]
         logger.debug(
             "WS RECEIVE %s MSG: %s",
@@ -60,8 +58,6 @@ class MainWebsocket(WebSocketEndpoint):
 
     async def on_connect(self, websocket: WebSocket):
         charge_point_id = websocket.path_params[CHARGE_POINT_ID]
-
-        print(websocket.client.__class__)
 
         logger.info(
             "WS CONNECT %s",
