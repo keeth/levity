@@ -70,7 +70,7 @@ services:
 
 
   rabbitmq:
-    image: rabbitmq:3-alpine
+    image: keeth/levity-rabbitmq
     ports:
       - '5672:5672'
     volumes:

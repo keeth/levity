@@ -88,6 +88,7 @@ class MainWebsocket(WebSocketEndpoint):
                 "Charge point %s on_disconnect: connection not found",
                 charge_point_id,
             )
+        logger.info("await client.disconnect()")
         await client.disconnect()
         logger.info(
             "WS DISCONNECT %s", dict(charge_point=charge_point_id, client=id(websocket))
