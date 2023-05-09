@@ -45,12 +45,16 @@ async def test_handle_message_from_charge_point(caplog):
                 assert data["type"] == "receive"
                 assert data["id"] == "1234"
                 assert data["message"] == send_msg
+            await asyncio.sleep(0.1)
             message = await rpc_send_queue.get()
             async with message.process():
                 data = json.loads(message.body.decode())
             assert data["type"] == "disconnect"
             assert data["id"] == "1234"
+        logger.info("EXIT amqp_connection")
+    logger.info("PRE SHUTDOWN")
     shutdown_event.set()
+    logger.info("POST SHUTDOWN")
 
 
 @pytest.mark.asyncio
@@ -65,7 +69,7 @@ async def test_send_message_to_charge_point(caplog):
         rpc_recv_queue = await amqp_channel.declare_queue("", exclusive=True)
         shutdown_event = asyncio.Event()
         set_global_context(amqp_channel, rpc_recv_queue, rpc_send_queue, shutdown_event)
-        asyncio.create_task(rpc_recv_queue_consumer())
+        consumer_task = asyncio.create_task(rpc_recv_queue_consumer())
         async with TestClient(app) as client:
             async with client.websocket_connect("/ws/1234") as websocket:
                 ws_message = await rpc_send_queue.get()
@@ -102,4 +106,8 @@ async def test_send_message_to_charge_point(caplog):
             async with ws_message.process():
                 data = json.loads(ws_message.body.decode())
             assert data["type"] == "disconnect"
-    shutdown_event.set()
+        logger.info("PRE SHUTDOWN")
+        shutdown_event.set()
+        logger.info("POST SHUTDOWN")
+        await consumer_task
+        logger.info("TEST EXIT")

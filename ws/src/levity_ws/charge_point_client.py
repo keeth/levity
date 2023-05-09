@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 CHARGE_POINT_EXCHANGE = "charge-point"
 
-CHARGER_REPLY_TIMEOUT_SECONDS = 10
+CHARGER_REPLY_TIMEOUT_SECONDS = 30
 
 CHARGER_COMMAND_DELAY_MS = 1000
 
@@ -50,6 +50,11 @@ class ChargePointClient:
                     self._charge_point_id,
                 )
                 return
+            logger.info(
+                "REPLY ID %s (charge point %s)",
+                reply_id,
+                self._charge_point_id,
+            )
             self._awaiting_replies[reply_id].set()
             del self._awaiting_replies[reply_id]
 
@@ -80,6 +85,7 @@ class ChargePointClient:
         await command_queue.bind(self._exchange)
         while not any([ctx.shutdown_event.is_set(), self._disconnect_event.is_set()]):
             async with command_queue.iterator() as queue_iter:
+                logger.info("FOR MESSAGE")
                 async for message in cancellable_iterator(
                     queue_iter, ctx.shutdown_event, self._disconnect_event
                 ):
@@ -150,4 +156,5 @@ class ChargePointClient:
                         logger.error(
                             "Error awaiting response %s", self._charge_point_id
                         )
+                logger.info("END FOR MESSAGE")
         logger.debug("CMD CONSUMER EXIT %s", self._charge_point_id)

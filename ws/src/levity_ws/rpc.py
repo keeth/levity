@@ -19,4 +19,5 @@ async def rpc_recv_queue_consumer():
                     logger.warning("SEND ERR (disconnected): %s", charge_point_id)
                     continue
                 await ctx.clients[charge_point_id].send_message_to_charge_point(decoded)
+        logger.info("END FOR MESSAGE")
     logger.info("BE CONSUMER SHUTDOWN")
