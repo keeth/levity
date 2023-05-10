@@ -34,15 +34,15 @@ class MainWebsocket(WebSocketEndpoint):
 
     async def on_receive(self, websocket: WebSocket, ws_message):
         charge_point_id = websocket.path_params[CHARGE_POINT_ID]
-        logger.debug(
-            "WS RECEIVE %s MSG: %s",
-            dict(charge_point=charge_point_id, client=id(websocket)),
+        logger.info(
+            "IN: WS %s: %s",
+            dict(cp=charge_point_id, ws=id(websocket)),
             ws_message,
         )
         if charge_point_id not in ctx.clients:
             logger.warning(
-                "Charge point %s was missing from clients (fixed)",
-                charge_point_id,
+                "ERR: WS %s: missing from clients (fixed)",
+                dict(cp=charge_point_id),
             )
             ctx.clients[charge_point_id] = ChargePointClient(charge_point_id, websocket)
             await self._rpc_send(dict(type="connect", id=charge_point_id))
@@ -60,10 +60,10 @@ class MainWebsocket(WebSocketEndpoint):
         charge_point_id = websocket.path_params[CHARGE_POINT_ID]
 
         logger.info(
-            "WS CONNECT %s",
+            "CONN: WS %s",
             dict(
-                charge_point=charge_point_id,
-                client=id(websocket),
+                cp=charge_point_id,
+                ws=id(websocket),
                 host=websocket.client.host if websocket.client else None,
             ),
         )
@@ -72,9 +72,12 @@ class MainWebsocket(WebSocketEndpoint):
         )
         if charge_point_id in ctx.clients:
             logger.warning(
-                "Charge point %s already connected from %s",
-                charge_point_id,
-                ctx.clients[charge_point_id].websocket.client.host,
+                "ERR: WS: already connected %s",
+                dict(
+                    cp=charge_point_id,
+                    ws=id(ctx.clients[charge_point_id].websocket),
+                    host=ctx.clients[charge_point_id].websocket.client.host,
+                ),
             )
             await ctx.clients[charge_point_id].disconnect()
         ctx.clients[charge_point_id] = ChargePointClient(charge_point_id, websocket)
@@ -88,11 +91,8 @@ class MainWebsocket(WebSocketEndpoint):
                 "Charge point %s on_disconnect: connection not found",
                 charge_point_id,
             )
-        logger.info("await client.disconnect()")
         await client.disconnect()
-        logger.info(
-            "WS DISCONNECT %s", dict(charge_point=charge_point_id, client=id(websocket))
-        )
+        logger.info("DISC: WS %s", dict(cp=charge_point_id, ws=id(websocket)))
         await self._rpc_send(dict(type="disconnect", id=charge_point_id))
 
 

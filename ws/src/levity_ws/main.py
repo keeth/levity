@@ -44,4 +44,4 @@ async def main_async():
         )
         server = GracefulShutdownServer(config, shutdown_event)
         await asyncio.gather(rpc_recv_queue_consumer(), server.serve())
-        logger.info("EXIT MAIN LOOP")
+        logger.info("EXIT: SERVER")

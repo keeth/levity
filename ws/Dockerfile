@@ -8,4 +8,5 @@ RUN pip install poetry && \
     rm -rf ~/.cache/pypoetry/{cache,artifacts} && \
     find ~/.cache/pypoetry/virtualenvs -name '*.pyc' -exec rm -rf '{}' \;
 COPY . .
+ENV PYTHONPATH=/app/src
 CMD poetry run python main.py
