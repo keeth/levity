@@ -78,7 +78,7 @@ export DJANGO_SETTINGS_MODULE=levity.settings
 
 ```shell
 cd ws/
-python main.py
+PYTHONPATH=src python main.py
 ```
 
 # Configuration
