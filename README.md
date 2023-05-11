@@ -2,6 +2,8 @@ Levity: An extensible OCPP server and EVSE management platform.
 
 # Install
 
+Levity runs well on a t4a.small instance (2GB RAM)
+
 ## Full install (non-TLS)
 
 ```shell
@@ -127,9 +129,9 @@ RabbitMQ is used as the RPC layer connecting **be** and **ws**.  When a **ws** s
 
 # State of the project
 
-Levity is currently running in production, managing a set of 20 Grizzl-e Smart charge points in a housing complex, to track individual electricity usage.
+Levity is currently running in production, managing a set of 20 Grizzl-E Smart charge points in a cohousing complex, to track individual electricity usage.
 
-Levity was originally built for an EVSE management use case where a charge point has a single owner/user, where ownership changes infrequently, and where no authentication is required. Authentication and user management are on the long term roadmap, however.
+Levity was originally built for a specific EVSE management use case: each charge point has a single owner/user and no authentication is required. Authentication and user management are on the long term roadmap, however.
 
 ## Features
 
@@ -138,16 +140,16 @@ Levity was originally built for an EVSE management use case where a charge point
 * Deployment via Docker Compose
 * Out-of-the-box support for TLS via LetsEncrypt
 * Middleware-style approach to extensibility (documentation TODO, see [auto_remote_start.py](be/ocpp/services/ocpp/anon/auto_remote_start.py) for an example)
-* Tested with the Grizzl-e Smart charger
+* Tested with the Grizzl-E Smart charger
 * Satisfies the OCPP 1.6j requirement for synchronicity - each charge point is allocated a separate "call queue" which ensures that Levity will wait for a response to a CALL message before sending another CALL message.
 
-## Grizzl-e Smart bug workarounds
+## Grizzl-E Smart bug workarounds
 
-The Grizzl-e Smart charger has several bugs in the current firmware (0.5) which are worked around by Levity:
+The Grizzl-E Smart charger has several bugs in the current firmware (0.5) which are worked around by Levity:
 
-* Websocket ping/pong is disabled, due to Grizzl-e sometimes sending invalid pongs.
-* The OCPP websocket protocol header is not required, because Grizzl-e does not send one.
-* The _RemoteTransactionStart_ message is delayed by 1 second after seeing the _Preparing_ status, due to an intermittent race condition observed with Grizzl-e.
+* Websocket ping/pong is disabled, due to Grizzl-E sometimes sending invalid pongs, causing disconnection.
+* The OCPP websocket protocol header is not required, because Grizzl-E does not send one.
+* The _RemoteStartTransaction_ message is delayed by 1 second after seeing the _Preparing_ status, due to an intermittent race condition observed with Grizzl-E, where the Grizzl-E fails to transition to the `Charging` state if it receives the _RemoteStartTransaction_ message too quickly.
 
 ## TODO
 
