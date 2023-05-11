@@ -13,9 +13,11 @@ async def rpc_recv_queue_consumer():
         async for message in cancellable_iterator(queue_iter, ctx.shutdown_event):
             async with message.process():
                 body = message.body.decode()
-                logger.info("IN: RPC %s", body)
                 decoded = json.loads(body)
                 charge_point_id = decoded["id"]
+                logger.info(
+                    "IN: RPC %s: %s", dict(cp=charge_point_id), decoded["message"]
+                )
                 if charge_point_id not in ctx.clients:
                     logger.warning("SEND ERR (disconnected): %s", charge_point_id)
                     continue

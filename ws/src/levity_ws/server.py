@@ -8,7 +8,7 @@ from starlette.responses import JSONResponse
 from starlette.routing import Route, WebSocketRoute
 from starlette.websockets import WebSocket
 
-from .charge_point_client import ChargePointClient
+from .cp import ChargePointClient
 from .config import CHARGE_POINT_ID
 from .global_context import ctx
 
@@ -28,6 +28,11 @@ class MainWebsocket(WebSocketEndpoint):
         rpc_message = Message(
             json.dumps(msg).encode(),
         )
+        log_params = dict(cp=msg["id"], type=msg["type"])
+        if msg["type"] == "receive":
+            log_params["mtype"] = msg["message"][0]
+            log_params["mid"] = msg["message"][1]
+        logger.info("OUT: RPC %s", log_params)
         await ctx.amqp_channel.default_exchange.publish(
             rpc_message, ctx.rpc_send_queue.name
         )
@@ -86,13 +91,13 @@ class MainWebsocket(WebSocketEndpoint):
     async def on_disconnect(self, websocket: WebSocket, close_code):
         charge_point_id = websocket.path_params[CHARGE_POINT_ID]
         client = ctx.clients.pop(charge_point_id, None)
+        logger.info("DISC: WS %s", dict(cp=charge_point_id, ws=id(websocket)))
         if not client:
             logger.warning(
                 "Charge point %s on_disconnect: connection not found",
                 charge_point_id,
             )
         await client.disconnect()
-        logger.info("DISC: WS %s", dict(cp=charge_point_id, ws=id(websocket)))
         await self._rpc_send(dict(type="disconnect", id=charge_point_id))
 
 

@@ -89,9 +89,7 @@ async def test_send_message_to_charge_point(caplog):
                     ),
                     routing_key=rpc_recv_queue.name,
                 )
-                logger.info("TestClient sleep")
                 await asyncio.sleep(2)
-                logger.info("TestClient wake")
                 ws_message = await websocket.receive_json()
                 assert ws_message == cmd_message
                 reply_msg = [3, "1", {"status": "Accepted"}]

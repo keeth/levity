@@ -49,7 +49,9 @@ class ChargePointClient:
                 return
             logger.info(
                 "IN: CP %s",
-                dict(id=reply_id, cp=self._charge_point_id),
+                dict(
+                    cp=self._charge_point_id, mtype=charge_point_reply[0], mid=reply_id
+                ),
             )
             self._awaiting_replies[reply_id].set()
             del self._awaiting_replies[reply_id]
@@ -62,9 +64,9 @@ class ChargePointClient:
             logger.info(
                 "OUT: CP %s",
                 dict(
-                    type=charge_point_message[0],
-                    id=charge_point_message[1],
                     cp=self._charge_point_id,
+                    mtype=charge_point_message[0],
+                    mid=charge_point_message[1],
                 ),
             )
             await self.websocket.send_json(charge_point_message)
@@ -74,14 +76,14 @@ class ChargePointClient:
                 json.dumps(charge_point_message).encode(),
                 headers={"x-delay": CHARGER_COMMAND_DELAY_MS},
             )
-            message = await self._exchange.publish(command_message, self._command_queue)
+            ack = await self._exchange.publish(command_message, self._command_queue)
             logger.info(
                 "OUTQ: CP %s",
                 dict(
-                    type=charge_point_message[0],
-                    id=charge_point_message[1],
-                    qid=message.delivery_tag,
                     cp=self._charge_point_id,
+                    mtype=charge_point_message[0],
+                    mid=charge_point_message[1],
+                    qid=ack.delivery_tag if ack else 0,
                 ),
             )
 
@@ -108,9 +110,9 @@ class ChargePointClient:
                         logger.info(
                             "INQ: CP %s",
                             dict(
-                                qid=message.unique_id,
-                                rd=message.redelivered,
                                 cp=self._charge_point_id,
+                                qid=message.delivery_tag,
+                                rd=message.redelivered,
                             ),
                         )
                         if self._charge_point_id not in ctx.clients:
@@ -121,9 +123,9 @@ class ChargePointClient:
                         logger.info(
                             "OUT CP: %s",
                             dict(
+                                cp=self._charge_point_id,
                                 type=charge_point_command[0],
                                 id=charge_point_command[1],
-                                cp=self._charge_point_id,
                             ),
                         )
                         command_id = charge_point_command[1]
@@ -131,7 +133,7 @@ class ChargePointClient:
                         self._awaiting_replies[command_id] = wait_for_reply
                         await self.websocket.send_json(charge_point_command)
                     except Exception:
-                        logger.exception("ERR: CP %s", self._charge_point_id)
+                        logger.exception("ERR: CP %s", dict(cp=self._charge_point_id))
                         raise
 
                     try:
@@ -145,7 +147,7 @@ class ChargePointClient:
                         ]
                         logger.info(
                             "START: CP reply-wait %s",
-                            dict(id=command_id, cp=self._charge_point_id),
+                            dict(cp=self._charge_point_id, mid=command_id),
                         )
                         done, pending = await asyncio.wait(
                             [*cancellation_tasks, reply_task],
@@ -156,12 +158,12 @@ class ChargePointClient:
                             if done_task in cancellation_tasks:
                                 logger.info(
                                     "EXIT: CP reply-wait %s",
-                                    dict(id=command_id, cp=self._charge_point_id),
+                                    dict(cp=self._charge_point_id, mid=command_id),
                                 )
                                 break
                         logger.info(
                             "END: CP reply-wait %s",
-                            dict(id=command_id, cp=self._charge_point_id),
+                            dict(cp=self._charge_point_id, mid=command_id),
                         )
                     except asyncio.TimeoutError:
                         logger.error(
