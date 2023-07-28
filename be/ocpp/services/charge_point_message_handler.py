@@ -4,6 +4,9 @@ from functools import lru_cache
 from ocpp.models.message import Message
 from ocpp.services.charge_point_service import ChargePointService
 from ocpp.services.ocpp.anon.auto_remote_start import AutoRemoteStartMiddleware
+from ocpp.services.ocpp.automation.orphaned_transaction import (
+    OrphanedTransactionMiddleware,
+)
 from ocpp.services.ocpp.base import ResponseMiddleware, OCPPRequest
 from ocpp.services.ocpp.core.authorize import AuthorizeMiddleware
 from ocpp.services.ocpp.core.boot_notification import BootNotificationMiddleware
@@ -37,7 +40,10 @@ DEFAULT_MIDDLEWARE_CONFIG = {
     ],
     (Action.Heartbeat, MessageType.call): [HeartbeatMiddleware],
     (Action.MeterValues, MessageType.call): [MeterValuesMiddleware],
-    (Action.StartTransaction, MessageType.call): [StartTransactionMiddleware],
+    (Action.StartTransaction, MessageType.call): [
+        OrphanedTransactionMiddleware,
+        StartTransactionMiddleware,
+    ],
     (Action.StatusNotification, MessageType.call): [
         AutoRemoteStartMiddleware,
         StatusNotificationMiddleware,

@@ -2,7 +2,7 @@ Levity: An extensible OCPP server and EVSE management platform.
 
 # Install
 
-Levity runs well on a t4a.small instance (2GB RAM)
+Levity runs well on a t4a.small instance (2GB of RAM)
 
 ## Full install (non-TLS)
 
