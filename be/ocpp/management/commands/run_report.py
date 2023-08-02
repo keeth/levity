@@ -9,6 +9,7 @@ from django.core.management.base import BaseCommand
 from ocpp.models import Transaction
 
 logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 DATETIME_FORMAT = "'%Y-%m-%d %H:%M:%S"
 
@@ -22,8 +23,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         tz = pytz.timezone(options["tz"])
-        options["start"] = options["start"].replace(tzinfo=datetime.timezone.utc)
-        options["end"] = options["end"].replace(tzinfo=datetime.timezone.utc)
+        options["start"] = tz.localize(options["start"])
+        options["end"] = tz.localize(options["end"])
         if options["report_type"] == "transaction":
             transactions = Transaction.objects.filter(
                 stopped_at__gte=options["start"], stopped_at__lt=options["end"]
@@ -44,8 +45,8 @@ class Command(BaseCommand):
                     [
                         tx.id,
                         tx.charge_point,
-                        (tx.started_at).astimezone(tz).strftime(DATETIME_FORMAT),
-                        (tx.stopped_at).astimezone(tz).strftime(DATETIME_FORMAT),
+                        tx.started_at.astimezone(tz).strftime(DATETIME_FORMAT),
+                        tx.stopped_at.astimezone(tz).strftime(DATETIME_FORMAT),
                         tx.meter_stop,
                         tx.stop_reason,
                     ]
