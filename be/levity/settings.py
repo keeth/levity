@@ -139,3 +139,5 @@ AMQP_URL = os.environ.get(
 )
 
 OCPP_HEARTBEAT_INTERVAL = 3600
+
+FLUENTD_HOST = os.environ.get("FLUENTD_HOST")

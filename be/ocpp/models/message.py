@@ -61,7 +61,9 @@ class Message(Timestamped):
         else:
             raise ValueError("Unknown message type {}".format(self.message_type))
 
-        return dict(id=self.charge_point.id, message=ocpp_message)
+        return dict(
+            id=self.charge_point.id, actor=str(self.actor), message=ocpp_message
+        )
 
     @staticmethod
     def from_occp(charge_point: ChargePoint, ocpp_message: dict):
