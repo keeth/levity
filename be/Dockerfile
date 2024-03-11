@@ -1,12 +1,12 @@
-FROM python:3-alpine
+FROM python:3.11-slim
 ENV DJANGO_SETTINGS_MODULE levity.settings
-ARG POETRY_ARGS
 WORKDIR /app
 COPY poetry.lock .
 COPY pyproject.toml .
-RUN apk --no-cache add libpq && \
+RUN apt-get update && apt-get -y install libpq-dev gcc && \
     pip install poetry && \
-    poetry install --no-root $POETRY_ARGS && \
+    poetry install --no-root && \
+    apt-get -y remove gcc && \
     rm -rf ~/.cache/pip && \
     rm -rf ~/.cache/pypoetry/{cache,artifacts} && \
     find ~/.cache/pypoetry/virtualenvs -name '*.pyc' -exec rm -rf '{}' \;
