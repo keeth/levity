@@ -5,13 +5,12 @@ import sys
 
 import pytz
 from django.core.management.base import BaseCommand
-
 from ocpp.models import Transaction
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-DATETIME_FORMAT = "'%Y-%m-%d %H:%M:%S"
+DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
 class Command(BaseCommand):
@@ -36,7 +35,8 @@ class Command(BaseCommand):
                     "charge_point",
                     "started_at",
                     "stopped_at",
-                    "meter (Wh)",
+                    "meter",
+                    "meter_correction",
                     "stop_reason",
                 ]
             )
@@ -48,8 +48,11 @@ class Command(BaseCommand):
                         tx.started_at.astimezone(tz).strftime(DATETIME_FORMAT),
                         tx.stopped_at.astimezone(tz).strftime(DATETIME_FORMAT),
                         tx.meter_stop,
+                        tx.meter_correction,
                         tx.stop_reason,
                     ]
                 )
+        elif options["report_type"] == "message":
+            pass
         else:
             raise ValueError("Unknown report type")

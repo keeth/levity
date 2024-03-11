@@ -47,7 +47,7 @@ docker compose run --rm be poetry run python manage.py createsuperuser
 
 Requirements:
 * Docker
-* Python 3
+* Python 3.11+ w/ Poetry 1.7+
 
 ### Install services
 

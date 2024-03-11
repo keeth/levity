@@ -2,3 +2,4 @@
 *.iml
 __pycache__
 /test_messages.txt
+.DS_Store
