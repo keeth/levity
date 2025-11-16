@@ -1,0 +1,196 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="readthedocs-addons-api-version" content="1"><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Client side usage &mdash; ocpp 2.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <script src="../_static/js/versions.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Debugging" href="../debugging.html" />
+    <link rel="prev" title="Server side usage" href="server_side.html" /> 
+<script async type="text/javascript" src="/_/static/javascript/readthedocs-addons.js"></script><meta name="readthedocs-project-slug" content="ocpp" /><meta name="readthedocs-version-slug" content="latest" /><meta name="readthedocs-resolver-filename" content="/usage/client_side.html" /><meta name="readthedocs-http-status" content="200" /></head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            ocpp
+          </a>
+              <div class="switch-menus">
+                <div class="version-switch"></div>
+                <div class="language-switch"></div>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Basic usage</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="server_side.html">Server side usage</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="server_side.html#create-a-websocket-server">Create a websocket server</a></li>
+<li class="toctree-l3"><a class="reference internal" href="server_side.html#ocpp-compliant-handler">OCPP compliant handler</a></li>
+</ul>
+</li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Client side usage</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../debugging.html">Debugging</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">ocpp</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Basic usage</a></li>
+      <li class="breadcrumb-item active">Client side usage</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/usage/client_side.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="client-side-usage">
+<h1>Client side usage<a class="headerlink" href="#client-side-usage" title="Link to this heading"></a></h1>
+<p>This document explains how to create a charge point and connect it to a central system.</p>
+<p>The following snippet creates a simple websocket client that connects to a central system running locally on port 9000.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># client.py</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">websockets</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">ocpp.v16</span><span class="w"> </span><span class="kn">import</span> <span class="n">ChargePoint</span> <span class="k">as</span> <span class="n">cp</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ocpp.v16</span><span class="w"> </span><span class="kn">import</span> <span class="n">call</span><span class="p">,</span> <span class="n">call_result</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ocpp.v16.enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">RegistrationStatus</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">ChargePoint</span><span class="p">(</span><span class="n">cp</span><span class="p">):</span>
+
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">send_boot_notification</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">request</span> <span class="o">=</span> <span class="n">call</span><span class="o">.</span><span class="n">BootNotification</span><span class="p">(</span>
+            <span class="n">charge_point_model</span><span class="o">=</span><span class="s2">&quot;Wallbox XYZ&quot;</span><span class="p">,</span>
+            <span class="n">charge_point_vendor</span><span class="o">=</span><span class="s2">&quot;acme&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">response</span><span class="p">:</span> <span class="n">call_result</span><span class="o">.</span><span class="n">BootNotification</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">call</span><span class="p">(</span><span class="n">request</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">response</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="n">RegistrationStatus</span><span class="o">.</span><span class="n">accepted</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Connected to central system.&quot;</span><span class="p">)</span>
+
+
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
+    <span class="k">async</span> <span class="k">with</span> <span class="n">websockets</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+        <span class="s2">&quot;ws://localhost:9000/CP_1&quot;</span><span class="p">,</span> <span class="n">subprotocols</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ocpp1.6&quot;</span><span class="p">]</span>
+    <span class="p">)</span> <span class="k">as</span> <span class="n">ws</span><span class="p">:</span>
+        <span class="n">charge_point</span> <span class="o">=</span> <span class="n">ChargePoint</span><span class="p">(</span><span class="s2">&quot;CP_1&quot;</span><span class="p">,</span> <span class="n">ws</span><span class="p">)</span>
+
+        <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">gather</span><span class="p">(</span>
+            <span class="n">charge_point</span><span class="o">.</span><span class="n">start</span><span class="p">(),</span>
+            <span class="n">charge_point</span><span class="o">.</span><span class="n">send_boot_notification</span><span class="p">(),</span>
+        <span class="p">)</span>
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">main</span><span class="p">())</span>
+</pre></div>
+</div>
+<p>A few things to note about the above code:</p>
+<ul>
+<li><p>The <a class="reference external" href="https://websockets.readthedocs.io/en/stable/reference/asyncio/client.html#websockets.asyncio.client.connect">websockets.connect()</a> method is used to create a websocket connection to the server.
+The first argument is the URL on which the connection is made. Note the <code class="docutils literal notranslate"><span class="pre">CP_1</span></code> suffix which is the charge point identifier.</p></li>
+<li><p>The subprotocol parameter is used to specify the OCPP version that the client supports.
+To connect with OCPP 2.0.1, you can specify the subprotocol as follows:</p>
+<blockquote>
+<div><div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">subprotocols</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ocpp2.0.1&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">ChargePoint</span></code> class subclasses the same <a class="reference external" href="https://github.com/search?q=repo%3Amobilityhouse%2Focpp+%22class+ChargePoint%28%22+path%3A%2F%5Eocpp%5C%2Fv16%5C%2F%2F&amp;type=code">ocpp.v16.ChargePoint</a> class that is used in the server example.
+This class implements the OCPP protocol and handles the communication with the server.</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">send_boot_notification()</span></code> method sends a <code class="docutils literal notranslate"><span class="pre">BootNotification</span></code> request to the server.
+To create a valid OCPP 1.6 message, the ocpp package provides support via pre-defined dataclasses that can be found in the <a class="reference external" href="https://github.com/mobilityhouse/ocpp/blob/master/ocpp/v16/call.py">call</a> module.</p></li>
+<li><p>The <a class="reference external" href="https://github.com/search?q=repo%3Amobilityhouse%2Focpp+%22class+ChargePoint%28%22+path%3A%2F%5Eocpp%5C%2Fv16%5C%2F%2F&amp;type=code">ocpp.v16.ChargePoint</a> expose a public coroutine: <a class="reference external" href="https://github.com/search?q=repo%3Amobilityhouse%2Focpp+%22def+call%22&amp;type=code">call()</a>, that accepts a payload, serializes it to a OCPP compliant message, and sends it to the server.
+It returns a serialized message in the form of the corresponding <a class="reference external" href="https://github.com/mobilityhouse/ocpp/blob/master/ocpp/v16/call_result.py">call_result</a> dataclass. In the above case it’s the <a class="reference external" href="https://github.com/search?q=repo%3Amobilityhouse%2Focpp+%22class+BootNotification%22+path%3A%2F%5Eocpp%5C%2Fv16%5C%2Fcall_result%2F&amp;type=code">ocpp.v16.call_result.BootNotification</a> dataclass.
+This allows you to focus on the business logic and let ocpp package handle all the heavy lifting which includes serialization, deserialization, and validation of payloads.</p></li>
+<li><p>The <a class="reference external" href="https://docs.python.org/3/library/asyncio-task.html#running-tasks-concurrently">asyncio.gather()</a> method is used to run multiple corouting concurrently.
+In this case, the <code class="docutils literal notranslate"><span class="pre">start()</span></code> method starts listening messages from the server and the <code class="docutils literal notranslate"><span class="pre">send_boot_notification()</span></code> method sends the <code class="docutils literal notranslate"><span class="pre">BootNotification</span></code> request to the server.</p></li>
+</ul>
+<p>After running the above script, you should see the following output:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>python<span class="w"> </span>client.py
+CP_1:<span class="w"> </span>send<span class="w"> </span><span class="o">[</span><span class="m">2</span>,<span class="w"> </span><span class="s2">&quot;e4c131d6-6b2c-4f50-9a0e-9242a37acb7a&quot;</span>,<span class="w"> </span><span class="s2">&quot;BootNotification&quot;</span>,<span class="w"> </span><span class="o">{</span><span class="s2">&quot;chargePointVendor&quot;</span>:<span class="w"> </span><span class="s2">&quot;Wallbox XYZ&quot;</span>,<span class="w"> </span><span class="s2">&quot;chargePointModel&quot;</span>:<span class="w"> </span><span class="s2">&quot;acme&quot;</span><span class="o">}]</span>
+CP_1:<span class="w"> </span>receive<span class="w"> </span>message<span class="w"> </span><span class="o">[</span><span class="m">3</span>,<span class="w"> </span><span class="s2">&quot;e4c131d6-6b2c-4f50-9a0e-9242a37acb7a&quot;</span>,<span class="w"> </span><span class="o">{</span><span class="s2">&quot;currentTime&quot;</span>:<span class="w"> </span><span class="s2">&quot;2025-05-10T12:00:00+00:00&quot;</span>,<span class="w"> </span><span class="s2">&quot;interval&quot;</span>:<span class="w"> </span><span class="m">10</span>,<span class="w"> </span><span class="s2">&quot;status&quot;</span>:<span class="w"> </span><span class="s2">&quot;Accepted&quot;</span><span class="o">}]</span>
+Connected<span class="w"> </span>to<span class="w"> </span>central<span class="w"> </span>system.
+</pre></div>
+</div>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="server_side.html" class="btn btn-neutral float-left" title="Server side usage" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../debugging.html" class="btn btn-neutral float-right" title="Debugging" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Mohit Jain.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

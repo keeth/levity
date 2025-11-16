@@ -1,0 +1,21 @@
+[project]
+name = "levity"
+version = "0.1.0"
+description = "OCPP Central System with SQLite storage"
+readme = "README.md"
+authors = [
+    { name = "Keith Grennan", email = "keith@nearlyfree.org" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "aiosqlite>=0.21.0",
+    "ocpp>=2.1.0",
+    "websockets>=15.0.1",
+]
+
+[project.scripts]
+levity = "levity.main:run"
+
+[build-system]
+requires = ["uv_build>=0.8.14,<0.9.0"]
+build-backend = "uv_build"
