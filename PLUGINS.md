@@ -66,6 +66,77 @@ from levity.plugins import OrphanedTransactionPlugin
 plugin = OrphanedTransactionPlugin()  # No configuration needed
 ```
 
+### FluentdAuditPlugin
+
+Sends structured audit logs of all OCPP events to Fluentd for centralized logging, analysis, and archival.
+
+**Use Case**: Compliance logging, analytics, debugging, billing integration
+
+**Behavior**:
+- Captures all OCPP messages (boot, heartbeat, status, transactions, meter values, authorization)
+- Sends to Fluentd with structured JSON format
+- Tags events by type (`ocpp.boot`, `ocpp.transaction.start`, `ocpp.meter`, etc.)
+- Includes charge point ID, timestamps, and all relevant message data
+- Calculates energy delivered for transaction stop events
+
+**Configuration**:
+```python
+from levity.plugins import FluentdAuditPlugin
+
+plugin = FluentdAuditPlugin(
+    tag_prefix="ocpp",            # Tag prefix (default: "ocpp")
+    host="localhost",             # Fluentd server (default: "localhost")
+    port=24224,                   # Fluentd port (default: 24224)
+    timeout=3.0,                  # Connection timeout (default: 3.0)
+)
+```
+
+**Example Event**:
+```json
+{
+  "event_type": "transaction_start",
+  "charge_point_id": "CP001",
+  "timestamp": "2024-01-15T10:30:00Z",
+  "connector_id": 1,
+  "id_tag": "USER-123",
+  "meter_start": 1000,
+  "transaction_id": 42
+}
+```
+
+### FluentdWebSocketAuditPlugin
+
+Logs WebSocket connection and disconnection events to Fluentd.
+
+**Use Case**: Monitor charge point connectivity, detect connection issues
+
+**Behavior**:
+- Logs connection events when charge points connect
+- Logs disconnection events when charge points disconnect
+- Includes charge point ID and timestamps
+- Attempts to include remote IP address if available
+
+**Configuration**:
+```python
+from levity.plugins import FluentdWebSocketAuditPlugin
+
+plugin = FluentdWebSocketAuditPlugin(
+    tag_prefix="ocpp",    # Tag prefix (default: "ocpp")
+    host="localhost",     # Fluentd server
+    port=24224,           # Fluentd port
+)
+```
+
+**Example Events**:
+```json
+{
+  "event_type": "websocket_connect",
+  "charge_point_id": "CP001",
+  "timestamp": "2024-01-15T10:00:00Z",
+  "remote_address": "192.168.1.100:54321"
+}
+```
+
 ## Creating Custom Plugins
 
 ### Step 1: Extend ChargePointPlugin

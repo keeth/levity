@@ -116,9 +116,18 @@ class LevityChargePoint(BaseChargePoint):
         """
         logger.debug(f"Heartbeat from {self.id}")
 
+        # Execute BEFORE hooks
+        message_data = {}
+        await self._execute_plugin_hooks(PluginHook.BEFORE_HEARTBEAT, message_data)
+
         await self.cp_repo.update_heartbeat(self.id, datetime.now(UTC))
 
-        return call_result.Heartbeat(current_time=datetime.now(UTC).isoformat())
+        result = call_result.Heartbeat(current_time=datetime.now(UTC).isoformat())
+
+        # Execute AFTER hooks
+        await self._execute_plugin_hooks(PluginHook.AFTER_HEARTBEAT, message_data, result)
+
+        return result
 
     @on(Action.status_notification)
     async def on_status_notification(
@@ -246,6 +255,15 @@ class LevityChargePoint(BaseChargePoint):
         """
         logger.info(f"StopTransaction from {self.id}, tx_id {transaction_id}")
 
+        # Execute BEFORE hooks
+        message_data = {
+            "meter_stop": meter_stop,
+            "timestamp": timestamp,
+            "transaction_id": transaction_id,
+            **kwargs,
+        }
+        await self._execute_plugin_hooks(PluginHook.BEFORE_STOP_TRANSACTION, message_data)
+
         stop_time = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
         reason = kwargs.get("reason", "")
 
@@ -266,7 +284,12 @@ class LevityChargePoint(BaseChargePoint):
         if transaction_data:
             await self._process_meter_values(transaction_id, self.id, transaction_data)
 
-        return call_result.StopTransaction(id_tag_info={"status": "Accepted"})
+        result = call_result.StopTransaction(id_tag_info={"status": "Accepted"})
+
+        # Execute AFTER hooks
+        await self._execute_plugin_hooks(PluginHook.AFTER_STOP_TRANSACTION, message_data, result)
+
+        return result
 
     @on(Action.meter_values)
     async def on_meter_values(self, connector_id: int, meter_value: list, **kwargs):
@@ -281,9 +304,22 @@ class LevityChargePoint(BaseChargePoint):
             f"tx {transaction_id}, {len(meter_value)} samples"
         )
 
+        # Execute BEFORE hooks
+        message_data = {
+            "connector_id": connector_id,
+            "meter_value": meter_value,
+            **kwargs,
+        }
+        await self._execute_plugin_hooks(PluginHook.BEFORE_METER_VALUES, message_data)
+
         await self._process_meter_values(transaction_id, self.id, meter_value, connector_id)
 
-        return call_result.MeterValues()
+        result = call_result.MeterValues()
+
+        # Execute AFTER hooks
+        await self._execute_plugin_hooks(PluginHook.AFTER_METER_VALUES, message_data, result)
+
+        return result
 
     async def _process_meter_values(
         self,
@@ -334,8 +370,17 @@ class LevityChargePoint(BaseChargePoint):
         """
         logger.info(f"Authorize request from {self.id} for tag {id_tag}")
 
+        # Execute BEFORE hooks
+        message_data = {"id_tag": id_tag}
+        await self._execute_plugin_hooks(PluginHook.BEFORE_AUTHORIZE, message_data)
+
         # For now, accept all authorizations
-        return call_result.Authorize(id_tag_info={"status": "Accepted"})
+        result = call_result.Authorize(id_tag_info={"status": "Accepted"})
+
+        # Execute AFTER hooks
+        await self._execute_plugin_hooks(PluginHook.AFTER_AUTHORIZE, message_data, result)
+
+        return result
 
     @after(Action.boot_notification)
     async def after_boot_notification(

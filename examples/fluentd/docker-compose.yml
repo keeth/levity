@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  fluentd:
+    image: fluent/fluentd:v1.16-1
+    container_name: ocpp-fluentd
+    ports:
+      - "24224:24224"      # Forward protocol (TCP)
+      - "24224:24224/udp"  # Forward protocol (UDP)
+    volumes:
+      - ./fluent.conf:/fluentd/etc/fluent.conf
+      - ./logs:/var/log/fluentd
+    environment:
+      - FLUENTD_CONF=fluent.conf
+    restart: unless-stopped
+
+  # Optional: Elasticsearch for log storage and search
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: ocpp-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    restart: unless-stopped
+
+  # Optional: Kibana for log visualization
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: ocpp-kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+
+volumes:
+  elasticsearch-data:
+    driver: local
