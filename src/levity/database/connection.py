@@ -21,12 +21,9 @@ class Database:
             self.connection = await aiosqlite.connect(self.db_path)
             self.connection.row_factory = aiosqlite.Row
 
-            # Configure optimal SQLite pragmas for concurrent OCPP workload
             await self.connection.execute("PRAGMA journal_mode=WAL")
             await self.connection.execute("PRAGMA synchronous=NORMAL")
-            await self.connection.execute("PRAGMA cache_size=-64000")
             await self.connection.execute("PRAGMA temp_store=MEMORY")
-            await self.connection.execute("PRAGMA mmap_size=30000000000")
             await self.connection.execute("PRAGMA foreign_keys=ON")
 
             logger.info(f"Connected to database: {self.db_path}")
