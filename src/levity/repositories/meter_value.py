@@ -14,9 +14,10 @@ class MeterValueRepository(BaseRepository):
                 tx_id, cp_id, cp_conn_id, timestamp, measurand, value,
                 unit, context, location, phase, format
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            RETURNING id
         """
 
-        await self._execute(
+        cursor = await self._execute(
             query,
             (
                 meter_value.tx_id,
@@ -33,10 +34,11 @@ class MeterValueRepository(BaseRepository):
             ),
         )
 
-        # Get the last inserted row ID
-        cursor = await self.conn.execute("SELECT last_insert_rowid()")
+        # Fetch BEFORE committing
         row = await cursor.fetchone()
-        meter_value.id = row[0] if row else None
+        await self.conn.commit()
+
+        meter_value.id = row["id"] if row else None
         return meter_value
 
     async def create_batch(self, meter_values: list[MeterValue]):

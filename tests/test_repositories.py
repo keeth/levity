@@ -236,13 +236,13 @@ class TestTransactionRepository:
             start_time=datetime.now(UTC),
             meter_start=0,
         )
-        await tx_repo.create(tx)
+        created_tx = await tx_repo.create(tx)
 
-        # Stop transaction
+        # Stop transaction using database ID
         stop_time = datetime.now(UTC)
-        await tx_repo.stop_transaction(12345, stop_time, 5000, "Local")
+        await tx_repo.stop_transaction(created_tx.id, stop_time, 5000, "Local")
 
-        result = await tx_repo.get_by_ocpp_tx_id(12345)
+        result = await tx_repo.get_by_id(created_tx.id)
         assert result.status == "Completed"
         assert result.meter_stop == 5000
         assert result.energy_delivered == 5000

@@ -10,10 +10,13 @@ class BaseRepository:
         self.conn = connection
 
     async def _execute(self, query: str, params: tuple = ()) -> aiosqlite.Cursor:
-        """Execute a query and return cursor."""
-        cursor = await self.conn.execute(query, params)
+        """Execute a query and return cursor (caller must fetch before committing)."""
+        return await self.conn.execute(query, params)
+
+    async def _execute_and_commit(self, query: str, params: tuple = ()) -> None:
+        """Execute a query and commit (for queries that don't return data)."""
+        await self.conn.execute(query, params)
         await self.conn.commit()
-        return cursor
 
     async def _fetchone(self, query: str, params: tuple = ()) -> aiosqlite.Row | None:
         """Execute query and fetch one row."""

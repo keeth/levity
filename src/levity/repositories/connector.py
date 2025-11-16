@@ -18,9 +18,10 @@ class ConnectorRepository(BaseRepository):
                 error_code = excluded.error_code,
                 vendor_error_code = excluded.vendor_error_code,
                 updated_at = CURRENT_TIMESTAMP
+            RETURNING id
         """
 
-        await self._execute(
+        cursor = await self._execute(
             query,
             (
                 connector.cp_id,
@@ -31,9 +32,12 @@ class ConnectorRepository(BaseRepository):
             ),
         )
 
-        # Fetch the inserted/updated row
-        result = await self.get_by_cp_and_connector(connector.cp_id, connector.conn_id)
-        return result if result else connector
+        # Fetch BEFORE committing
+        row = await cursor.fetchone()
+        await self.conn.commit()
+
+        connector.id = row["id"] if row else None
+        return connector
 
     async def get_by_cp_and_connector(self, cp_id: str, conn_id: int) -> Connector | None:
         """Get connector by charge point ID and connector ID."""

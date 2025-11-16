@@ -16,9 +16,10 @@ class TransactionRepository(BaseRepository):
                 tx_id, cp_id, cp_conn_id, id_tag, start_time,
                 meter_start, status
             ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            RETURNING id
         """
 
-        await self._execute(
+        cursor = await self._execute(
             query,
             (
                 tx.tx_id,
@@ -31,10 +32,11 @@ class TransactionRepository(BaseRepository):
             ),
         )
 
-        # Get the last inserted row ID
-        cursor = await self.conn.execute("SELECT last_insert_rowid()")
+        # Fetch BEFORE committing
         row = await cursor.fetchone()
-        tx.id = row[0] if row else None
+        await self.conn.commit()
+
+        tx.id = row["id"] if row else None
         return tx
 
     async def get_by_id(self, tx_id: int) -> Transaction | None:
@@ -68,12 +70,12 @@ class TransactionRepository(BaseRepository):
 
     async def stop_transaction(
         self,
-        ocpp_tx_id: int,
+        tx_db_id: int,
         stop_time: datetime,
         meter_stop: int,
         stop_reason: str = "",
     ):
-        """Stop a transaction."""
+        """Stop a transaction by database ID."""
         query = """
             UPDATE tx
             SET stop_time = ?,
@@ -82,9 +84,11 @@ class TransactionRepository(BaseRepository):
                 stop_reason = ?,
                 status = 'Completed',
                 updated_at = CURRENT_TIMESTAMP
-            WHERE tx_id = ?
+            WHERE id = ?
         """
-        await self._execute(query, (stop_time, meter_stop, meter_stop, stop_reason, ocpp_tx_id))
+        await self._execute_and_commit(
+            query, (stop_time, meter_stop, meter_stop, stop_reason, tx_db_id)
+        )
 
     async def get_all_for_cp(self, cp_id: str, limit: int = 100) -> list[Transaction]:
         """Get transactions for a charge point."""

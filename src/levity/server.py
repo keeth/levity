@@ -61,11 +61,16 @@ class OCPPServer:
         self.charge_points[charge_point_id] = charge_point
 
         try:
+            # Get current timestamp from database
+            cursor = await charge_point.cp_repo.conn.execute("SELECT datetime('now')")
+            row = await cursor.fetchone()
+            current_time = row[0] if row else None
+
             # Update connection status in database
             await charge_point.cp_repo.update_connection_status(
                 charge_point_id,
                 True,
-                charge_point.cp_repo.conn.execute("SELECT datetime('now')").fetchone()[0],
+                current_time,
             )
 
             logger.info(f"Charge point {charge_point_id} connected")

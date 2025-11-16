@@ -59,23 +59,22 @@ Each repository (`repositories/`) handles one table:
 - All methods are async (using aiosqlite)
 - Returns domain models (dataclasses from `models/domain.py`)
 
-### SQLite Compatibility Issues Encountered
+### SQLite RETURNING Clause Pattern
 
-**Problem**: `RETURNING` clause in INSERT statements failed with "cannot commit transaction - SQL statements in progress"
+**Important**: SQLite 3.35.0+ supports the `RETURNING` clause, but you must fetch results BEFORE committing the transaction.
 
-**Solution**: Replaced `RETURNING id` with `last_insert_rowid()` for better SQLite compatibility:
-
+**Correct Pattern**:
 ```python
-# Instead of:
+# Repository method using RETURNING
 cursor = await self._execute("INSERT ... RETURNING id", params)
-row = await cursor.fetchone()
-
-# Use:
-await self._execute("INSERT ...", params)
-cursor = await self.conn.execute("SELECT last_insert_rowid()")
-row = await cursor.fetchone()
-tx.id = row[0]
+row = await cursor.fetchone()  # Fetch BEFORE commit
+await self.conn.commit()        # Then commit
+return_id = row["id"] if row else None
 ```
+
+**Why this matters**: The `BaseRepository._execute()` method does NOT auto-commit, allowing the caller to fetch from RETURNING cursors before committing. Use `_execute_and_commit()` for UPDATE/DELETE queries that don't return data.
+
+**Common Mistake**: Committing before fetching from a RETURNING cursor causes "cannot commit transaction - SQL statements in progress" error.
 
 ### Schema Initialization
 
