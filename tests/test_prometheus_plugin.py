@@ -1,0 +1,306 @@
+"""Tests for the Prometheus metrics plugin."""
+
+from datetime import UTC, datetime
+from unittest.mock import MagicMock
+
+import pytest
+from ocpp.v16.enums import ChargePointStatus
+from prometheus_client import REGISTRY
+
+from levity.models import ChargePoint as ChargePointModel
+from levity.models import Connector, Transaction
+from levity.plugins import PrometheusMetricsPlugin
+
+
+async def create_test_charge_point(cp_id, db_connection, plugins=None):
+    """Helper to create a charge point with database record."""
+    from levity.handlers import LevityChargePoint
+
+    mock_connection = MagicMock()
+    cp = LevityChargePoint(cp_id, mock_connection, db_connection, plugins=plugins)
+
+    # Create charge point database record
+    await cp.cp_repo.upsert(
+        ChargePointModel(id=cp_id, vendor="Test", model="Test", is_connected=True)
+    )
+
+    # Initialize plugins (normally done by server)
+    if plugins:
+        for plugin in plugins:
+            await plugin.initialize(cp)
+
+    return cp
+
+
+def get_metric_value(metric, labels):
+    """Helper to get current value of a metric with specific labels."""
+    for sample in metric.collect()[0].samples:
+        if sample.labels == labels:
+            return sample.value
+    return None
+
+
+class TestPrometheusMetricsPlugin:
+    """Test the Prometheus metrics plugin."""
+
+    @pytest.mark.asyncio
+    async def test_plugin_initialization(self, db_connection):
+        """Test that metrics are initialized on plugin creation."""
+        plugin = PrometheusMetricsPlugin()
+        cp = await create_test_charge_point("TEST001", db_connection, plugins=[plugin])
+
+        # Verify connection metric
+        value = get_metric_value(plugin.ocpp_cp_connected, {"cp_id": "TEST001"})
+        assert value == 1.0
+
+        # Verify central system is up
+        samples = list(plugin.ocpp_central_up.collect()[0].samples)
+        assert len(samples) > 0
+        assert samples[0].value == 1.0
+
+    @pytest.mark.asyncio
+    async def test_cleanup_marks_disconnected(self, db_connection):
+        """Test that cleanup marks charge point as disconnected."""
+        plugin = PrometheusMetricsPlugin()
+        cp = await create_test_charge_point("TEST001", db_connection, plugins=[plugin])
+
+        # Initially connected
+        value = get_metric_value(plugin.ocpp_cp_connected, {"cp_id": "TEST001"})
+        assert value == 1.0
+
+        # Cleanup
+        await plugin.cleanup(cp)
+
+        # Now disconnected
+        value = get_metric_value(plugin.ocpp_cp_connected, {"cp_id": "TEST001"})
+        assert value == 0.0
+
+        # Disconnect counter incremented
+        value = get_metric_value(plugin.ocpp_cp_disconnects_total, {"cp_id": "TEST001"})
+        assert value == 1.0
+
+    @pytest.mark.asyncio
+    async def test_boot_notification_tracking(self, db_connection):
+        """Test that boot notifications increment counter."""
+        plugin = PrometheusMetricsPlugin()
+        cp = await create_test_charge_point("TEST001", db_connection, plugins=[plugin])
+
+        # Send boot notification
+        await cp.on_boot_notification("TestVendor", "TestModel")
+
+        # Verify boot counter
+        value = get_metric_value(plugin.ocpp_cp_boots_total, {"cp_id": "TEST001"})
+        assert value == 1.0
+
+    @pytest.mark.asyncio
+    async def test_heartbeat_tracking(self, db_connection):
+        """Test that heartbeat updates timestamp."""
+        plugin = PrometheusMetricsPlugin()
+        cp = await create_test_charge_point("TEST001", db_connection, plugins=[plugin])
+
+        # Send heartbeat
+        await cp.on_heartbeat()
+
+        # Verify heartbeat timestamp is set
+        value = get_metric_value(plugin.ocpp_cp_last_heartbeat_ts, {"cp_id": "TEST001"})
+        assert value is not None
+        assert value > 0
+
+    @pytest.mark.asyncio
+    async def test_status_notification_tracking(self, db_connection):
+        """Test that status notifications update metrics."""
+        plugin = PrometheusMetricsPlugin()
+        cp = await create_test_charge_point("TEST001", db_connection, plugins=[plugin])
+
+        # Send status notification for charge point (connector 0)
+        await cp.on_status_notification(
+            connector_id=0,
+            error_code="NoError",
+            status=ChargePointStatus.available,
+        )
+
+        # Verify status metric
+        value = get_metric_value(plugin.ocpp_cp_status, {"cp_id": "TEST001"})
+        assert value == 0.0  # Available = 0
+
+    @pytest.mark.asyncio
+    async def test_error_tracking(self, db_connection):
+        """Test that errors are counted."""
+        plugin = PrometheusMetricsPlugin()
+        cp = await create_test_charge_point("TEST001", db_connection, plugins=[plugin])
+
+        # Send status notification with error
+        await cp.on_status_notification(
+            connector_id=1,
+            error_code="GroundFailure",
+            status=ChargePointStatus.faulted,
+        )
+
+        # Verify error counter
+        value = get_metric_value(
+            plugin.ocpp_cp_errors_total,
+            {"cp_id": "TEST001", "error_type": "GroundFailure"},
+        )
+        assert value == 1.0
+
+    @pytest.mark.asyncio
+    async def test_transaction_start_tracking(self, db_connection):
+        """Test that transaction start updates metrics."""
+        plugin = PrometheusMetricsPlugin()
+        cp = await create_test_charge_point("TEST001", db_connection, plugins=[plugin])
+
+        # Start transaction
+        await cp.on_start_transaction(
+            connector_id=1,
+            id_tag="USER-123",
+            meter_start=1000,
+            timestamp="2024-01-15T10:00:00Z",
+        )
+
+        # Verify transaction active
+        value = get_metric_value(
+            plugin.ocpp_tx_active,
+            {"cp_id": "TEST001", "connector_id": "1"},
+        )
+        assert value == 1.0
+
+        # Verify transaction counter
+        value = get_metric_value(plugin.ocpp_tx_total, {"cp_id": "TEST001"})
+        assert value == 1.0
+
+        # Verify energy gauge initialized
+        value = get_metric_value(
+            plugin.ocpp_tx_energy_wh,
+            {"cp_id": "TEST001", "connector_id": "1"},
+        )
+        assert value == 0.0
+
+    @pytest.mark.asyncio
+    async def test_transaction_stop_tracking(self, db_connection):
+        """Test that transaction stop updates metrics."""
+        plugin = PrometheusMetricsPlugin()
+        cp = await create_test_charge_point("TEST001", db_connection, plugins=[plugin])
+
+        # Create a transaction first
+        connector = Connector(cp_id="TEST001", conn_id=1, status=ChargePointStatus.charging)
+        connector = await cp.conn_repo.upsert(connector)
+
+        tx = Transaction(
+            cp_id="TEST001",
+            cp_conn_id=connector.id,
+            id_tag="USER-123",
+            start_time=datetime(2024, 1, 15, 10, 0, 0, tzinfo=UTC),
+            meter_start=1000,
+            status="Active",
+        )
+        tx = await cp.tx_repo.create(tx)
+
+        # Stop transaction
+        await cp.on_stop_transaction(
+            transaction_id=tx.id,
+            meter_stop=5000,
+            timestamp="2024-01-15T11:00:00Z",
+            reason="Local",
+        )
+
+        # Verify transaction no longer active
+        value = get_metric_value(
+            plugin.ocpp_tx_active,
+            {"cp_id": "TEST001", "connector_id": "1"},
+        )
+        assert value == 0.0
+
+        # Verify energy counter incremented
+        value = get_metric_value(plugin.ocpp_cp_energy_total_wh, {"cp_id": "TEST001"})
+        assert value == 4000.0  # 5000 - 1000
+
+        # Verify last transaction timestamp
+        value = get_metric_value(plugin.ocpp_cp_last_tx_ts, {"cp_id": "TEST001"})
+        assert value is not None
+        assert value > 0
+
+    @pytest.mark.asyncio
+    async def test_meter_values_tracking(self, db_connection):
+        """Test that meter values update metrics."""
+        plugin = PrometheusMetricsPlugin()
+        cp = await create_test_charge_point("TEST001", db_connection, plugins=[plugin])
+
+        # Create a transaction first
+        connector = Connector(cp_id="TEST001", conn_id=1, status=ChargePointStatus.charging)
+        connector = await cp.conn_repo.upsert(connector)
+
+        tx = Transaction(
+            cp_id="TEST001",
+            cp_conn_id=connector.id,
+            id_tag="USER-123",
+            start_time=datetime(2024, 1, 15, 10, 0, 0, tzinfo=UTC),
+            meter_start=1000,
+            status="Active",
+        )
+        tx = await cp.tx_repo.create(tx)
+
+        # Send meter values
+        meter_value = [
+            {
+                "timestamp": "2024-01-15T10:30:00Z",
+                "sampled_value": [
+                    {"value": "3000", "measurand": "Energy.Active.Import.Register"},
+                    {"value": "16.5", "measurand": "Current.Import"},
+                ],
+            }
+        ]
+
+        await cp.on_meter_values(connector_id=1, meter_value=meter_value, transaction_id=tx.id)
+
+        # Verify energy metric
+        value = get_metric_value(
+            plugin.ocpp_tx_energy_wh,
+            {"cp_id": "TEST001", "connector_id": "1"},
+        )
+        assert value == 2000.0  # 3000 - 1000 (meter_start)
+
+        # Verify current metric
+        value = get_metric_value(
+            plugin.ocpp_cp_current_a,
+            {"cp_id": "TEST001", "connector_id": "1"},
+        )
+        assert value == 16.5
+
+    @pytest.mark.asyncio
+    async def test_message_latency_tracking(self, db_connection):
+        """Test that message handling latency is recorded."""
+        plugin = PrometheusMetricsPlugin()
+        cp = await create_test_charge_point("TEST001", db_connection, plugins=[plugin])
+
+        # Send a message (boot notification)
+        await cp.on_boot_notification("TestVendor", "TestModel")
+
+        # Check that histogram has samples
+        samples = list(plugin.ocpp_msg_handling_seconds.collect()[0].samples)
+        # Filter for our charge point
+        cp_samples = [s for s in samples if s.labels.get("cp_id") == "TEST001"]
+        assert len(cp_samples) > 0
+
+    @pytest.mark.asyncio
+    async def test_multiple_charge_points(self, db_connection):
+        """Test that metrics work with multiple charge points."""
+        plugin = PrometheusMetricsPlugin()
+
+        # Create two charge points
+        cp1 = await create_test_charge_point("CP001", db_connection, plugins=[plugin])
+        cp2 = await create_test_charge_point("CP002", db_connection, plugins=[plugin])
+
+        # Both should be connected
+        value1 = get_metric_value(plugin.ocpp_cp_connected, {"cp_id": "CP001"})
+        value2 = get_metric_value(plugin.ocpp_cp_connected, {"cp_id": "CP002"})
+        assert value1 == 1.0
+        assert value2 == 1.0
+
+        # Disconnect one
+        await plugin.cleanup(cp1)
+
+        # Only cp2 should be connected
+        value1 = get_metric_value(plugin.ocpp_cp_connected, {"cp_id": "CP001"})
+        value2 = get_metric_value(plugin.ocpp_cp_connected, {"cp_id": "CP002"})
+        assert value1 == 0.0
+        assert value2 == 1.0

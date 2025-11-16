@@ -2,9 +2,11 @@
 
 import asyncio
 import logging
-from typing import Callable
+from collections.abc import Callable
 
 import websockets
+from aiohttp import web
+from prometheus_client import generate_latest
 from websockets.asyncio.server import ServerConnection
 
 from .database import Database
@@ -30,12 +32,16 @@ class OCPPServer:
         host: str = "0.0.0.0",
         port: int = 9000,
         plugin_factory: Callable[[], list[ChargePointPlugin]] | None = None,
+        metrics_port: int | None = None,
     ):
         self.db = db
         self.host = host
         self.port = port
         self.charge_points: dict[str, LevityChargePoint] = {}
-        self.plugin_factory = plugin_factory or (lambda: [])
+        self.plugin_factory = plugin_factory or (list)
+        self.metrics_port = metrics_port
+        self.metrics_app = None
+        self.metrics_runner = None
 
     async def on_connect(self, connection: ServerConnection):
         """
@@ -114,6 +120,33 @@ class OCPPServer:
                 del self.charge_points[charge_point_id]
             logger.info(f"Charge point {charge_point_id} disconnected")
 
+    async def metrics_handler(self, request):
+        """Handle /metrics endpoint for Prometheus."""
+        metrics = generate_latest()
+        return web.Response(body=metrics, content_type="text/plain; charset=utf-8")
+
+    async def start_metrics_server(self):
+        """Start the HTTP server for Prometheus metrics."""
+        if self.metrics_port is None:
+            return
+
+        self.metrics_app = web.Application()
+        self.metrics_app.router.add_get("/metrics", self.metrics_handler)
+
+        self.metrics_runner = web.AppRunner(self.metrics_app)
+        await self.metrics_runner.setup()
+
+        site = web.TCPSite(self.metrics_runner, self.host, self.metrics_port)
+        await site.start()
+
+        logger.info(f"Prometheus metrics server listening on http://{self.host}:{self.metrics_port}/metrics")
+
+    async def stop_metrics_server(self):
+        """Stop the metrics HTTP server."""
+        if self.metrics_runner:
+            await self.metrics_runner.cleanup()
+            logger.info("Prometheus metrics server stopped")
+
     async def start(self):
         """
         Start the WebSocket server.
@@ -124,6 +157,9 @@ class OCPPServer:
 
         # Initialize database
         await self.db.initialize_schema()
+
+        # Start metrics server if configured
+        await self.start_metrics_server()
 
         # Start WebSocket server
         async with websockets.serve(
@@ -138,6 +174,9 @@ class OCPPServer:
     async def stop(self):
         """Stop the server and cleanup resources."""
         logger.info("Stopping OCPP server")
+
+        # Stop metrics server
+        await self.stop_metrics_server()
 
         # Disconnect all charge points
         for cp_id, cp in list(self.charge_points.items()):

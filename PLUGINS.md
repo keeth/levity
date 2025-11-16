@@ -137,6 +137,47 @@ plugin = FluentdWebSocketAuditPlugin(
 }
 ```
 
+### PrometheusMetricsPlugin
+
+Exposes Prometheus metrics for monitoring OCPP Central System performance, charge point status, and transaction activity.
+
+**Use Case**: Production monitoring, alerting, performance analysis, capacity planning
+
+**Behavior**:
+- Tracks service-level metrics (message handling latency, uptime)
+- Monitors per-charge-point connection status and health
+- Records transaction lifecycle and energy delivery
+- Measures current draw and power consumption
+- Counts errors and boots
+- All metrics exposed via `/metrics` HTTP endpoint
+
+**Configuration**:
+```python
+from levity.plugins import PrometheusMetricsPlugin
+from levity.server import OCPPServer
+
+def create_plugins():
+    return [PrometheusMetricsPlugin()]
+
+server = OCPPServer(
+    db=db,
+    host="0.0.0.0",
+    port=9000,
+    plugin_factory=create_plugins,
+    metrics_port=9090,  # Enable /metrics endpoint
+)
+```
+
+**Key Metrics**:
+- `ocpp_central_up` - Central system uptime
+- `ocpp_cp_connected{cp_id}` - Connection status per charge point
+- `ocpp_tx_active{cp_id, connector_id}` - Active transactions
+- `ocpp_cp_energy_total_wh{cp_id}` - Cumulative energy delivered
+- `ocpp_cp_current_a{cp_id, connector_id}` - Real-time current draw
+- `ocpp_msg_handling_seconds` - Message processing latency
+
+See [examples/prometheus/README.md](examples/prometheus/README.md) for complete metrics list and example queries.
+
 ## Creating Custom Plugins
 
 ### Step 1: Extend ChargePointPlugin

@@ -1,0 +1,33 @@
+# Prometheus configuration for Levity OCPP monitoring
+
+global:
+  scrape_interval: 15s       # Scrape metrics every 15 seconds
+  evaluation_interval: 15s   # Evaluate rules every 15 seconds
+
+  # Attach these labels to metrics when communicating with external systems
+  external_labels:
+    monitor: 'levity-ocpp'
+
+# Scrape configuration
+scrape_configs:
+  # Job for Levity OCPP Central System
+  - job_name: 'levity-ocpp'
+
+    # Override global scrape interval for this job
+    scrape_interval: 10s
+
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          instance: 'central-system-1'
+          environment: 'development'
+
+# Alerting configuration (optional)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ['localhost:9093']
+
+# Rule files (optional)
+# rule_files:
+#   - 'alerts.yml'
