@@ -1,7 +1,5 @@
 """Base repository class."""
 
-from typing import Optional
-
 import aiosqlite
 
 
@@ -17,7 +15,7 @@ class BaseRepository:
         await self.conn.commit()
         return cursor
 
-    async def _fetchone(self, query: str, params: tuple = ()) -> Optional[aiosqlite.Row]:
+    async def _fetchone(self, query: str, params: tuple = ()) -> aiosqlite.Row | None:
         """Execute query and fetch one row."""
         cursor = await self.conn.execute(query, params)
         return await cursor.fetchone()

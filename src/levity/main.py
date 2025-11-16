@@ -23,9 +23,7 @@ def setup_logging(level: str = "INFO"):
 
 async def main():
     """Main application entry point."""
-    parser = argparse.ArgumentParser(
-        description="Levity - OCPP Central System with SQLite storage"
-    )
+    parser = argparse.ArgumentParser(description="Levity - OCPP Central System with SQLite storage")
     parser.add_argument(
         "--host",
         default="0.0.0.0",

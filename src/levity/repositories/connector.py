@@ -1,7 +1,5 @@
 """Repository for connector operations."""
 
-from typing import Optional
-
 from ..models import Connector
 from .base import BaseRepository
 
@@ -38,9 +36,7 @@ class ConnectorRepository(BaseRepository):
         connector.id = row["id"] if row else None
         return connector
 
-    async def get_by_cp_and_connector(
-        self, cp_id: str, conn_id: int
-    ) -> Optional[Connector]:
+    async def get_by_cp_and_connector(self, cp_id: str, conn_id: int) -> Connector | None:
         """Get connector by charge point ID and connector ID."""
         row = await self._fetchone(
             "SELECT * FROM cp_conn WHERE cp_id = ? AND conn_id = ?", (cp_id, conn_id)
@@ -49,7 +45,7 @@ class ConnectorRepository(BaseRepository):
             return self._row_to_model(row)
         return None
 
-    async def get_by_id(self, connector_id: int) -> Optional[Connector]:
+    async def get_by_id(self, connector_id: int) -> Connector | None:
         """Get connector by database ID."""
         row = await self._fetchone("SELECT * FROM cp_conn WHERE id = ?", (connector_id,))
         if row:
@@ -80,9 +76,7 @@ class ConnectorRepository(BaseRepository):
                 updated_at = CURRENT_TIMESTAMP
             WHERE cp_id = ? AND conn_id = ?
         """
-        await self._execute(
-            query, (status, error_code, vendor_error_code, cp_id, conn_id)
-        )
+        await self._execute(query, (status, error_code, vendor_error_code, cp_id, conn_id))
 
     def _row_to_model(self, row) -> Connector:
         """Convert database row to Connector model."""

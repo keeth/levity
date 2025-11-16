@@ -1,7 +1,6 @@
 """Repository for charge point operations."""
 
 from datetime import datetime
-from typing import Optional
 
 from ..models import ChargePoint
 from .base import BaseRepository
@@ -60,7 +59,7 @@ class ChargePointRepository(BaseRepository):
 
         return await self.get_by_id(cp.id)
 
-    async def get_by_id(self, cp_id: str) -> Optional[ChargePoint]:
+    async def get_by_id(self, cp_id: str) -> ChargePoint | None:
         """Get charge point by ID."""
         row = await self._fetchone("SELECT * FROM cp WHERE id = ?", (cp_id,))
         if row:
@@ -73,7 +72,7 @@ class ChargePointRepository(BaseRepository):
         return [self._row_to_model(row) for row in rows]
 
     async def update_connection_status(
-        self, cp_id: str, is_connected: bool, connect_time: Optional[datetime] = None
+        self, cp_id: str, is_connected: bool, connect_time: datetime | None = None
     ):
         """Update charge point connection status."""
         query = """

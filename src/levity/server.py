@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-from typing import Optional
 
 import websockets
 from websockets.asyncio.server import ServerConnection
@@ -64,9 +63,9 @@ class OCPPServer:
         try:
             # Update connection status in database
             await charge_point.cp_repo.update_connection_status(
-                charge_point_id, True, charge_point.cp_repo.conn.execute(
-                    "SELECT datetime('now')"
-                ).fetchone()[0]
+                charge_point_id,
+                True,
+                charge_point.cp_repo.conn.execute("SELECT datetime('now')").fetchone()[0],
             )
 
             logger.info(f"Charge point {charge_point_id} connected")
@@ -102,7 +101,7 @@ class OCPPServer:
             self.host,
             self.port,
             subprotocols=["ocpp1.6"],
-        ) as server:
+        ):
             logger.info(f"OCPP server listening on ws://{self.host}:{self.port}/ws/{{cp_id}}")
             await asyncio.Future()  # Run forever
 

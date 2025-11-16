@@ -1,3 +1,3 @@
-from .domain import ChargePoint, Connector, Transaction, MeterValue
+from .domain import ChargePoint, Connector, MeterValue, Transaction
 
-__all__ = ["ChargePoint", "Connector", "Transaction", "MeterValue"]
+__all__ = ["ChargePoint", "Connector", "MeterValue", "Transaction"]

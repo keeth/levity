@@ -1,8 +1,7 @@
 """Domain models for the OCPP central system."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
 
 
 @dataclass
@@ -19,58 +18,58 @@ class ChargePoint:
     imsi: str = ""
     status: str = "Unknown"
     is_connected: bool = False
-    last_heartbeat_at: Optional[datetime] = None
-    last_boot_at: Optional[datetime] = None
-    last_connect_at: Optional[datetime] = None
-    last_tx_start_at: Optional[datetime] = None
-    last_tx_stop_at: Optional[datetime] = None
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    last_heartbeat_at: datetime | None = None
+    last_boot_at: datetime | None = None
+    last_connect_at: datetime | None = None
+    last_tx_start_at: datetime | None = None
+    last_tx_stop_at: datetime | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 @dataclass
 class Connector:
     """Represents a connector on a charge point."""
 
-    id: Optional[int] = None
+    id: int | None = None
     cp_id: str = ""
     conn_id: int = 0
     status: str = "Available"
     error_code: str = ""
     vendor_error_code: str = ""
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 @dataclass
 class Transaction:
     """Represents a charging transaction."""
 
-    id: Optional[int] = None
-    tx_id: Optional[int] = None
+    id: int | None = None
+    tx_id: int | None = None
     cp_id: str = ""
     cp_conn_id: int = 0
     id_tag: str = ""
-    start_time: Optional[datetime] = None
-    stop_time: Optional[datetime] = None
+    start_time: datetime | None = None
+    stop_time: datetime | None = None
     meter_start: int = 0
-    meter_stop: Optional[int] = None
+    meter_stop: int | None = None
     energy_delivered: int = 0
     stop_reason: str = ""
     status: str = "Active"
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 @dataclass
 class MeterValue:
     """Represents a meter value reading."""
 
-    id: Optional[int] = None
-    tx_id: Optional[int] = None
+    id: int | None = None
+    tx_id: int | None = None
     cp_id: str = ""
     cp_conn_id: int = 0
-    timestamp: Optional[datetime] = None
+    timestamp: datetime | None = None
     measurand: str = ""
     value: float = 0.0
     unit: str = "Wh"
@@ -78,4 +77,4 @@ class MeterValue:
     location: str = "Outlet"
     phase: str = ""
     format: str = "Raw"
-    created_at: Optional[datetime] = None
+    created_at: datetime | None = None

@@ -80,9 +80,7 @@ class MeterValueRepository(BaseRepository):
         )
         return [self._row_to_model(row) for row in rows]
 
-    async def get_for_cp(
-        self, cp_id: str, limit: int = 1000
-    ) -> list[MeterValue]:
+    async def get_for_cp(self, cp_id: str, limit: int = 1000) -> list[MeterValue]:
         """Get recent meter values for a charge point."""
         rows = await self._fetchall(
             """

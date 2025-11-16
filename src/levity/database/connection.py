@@ -2,7 +2,6 @@
 
 import logging
 from pathlib import Path
-from typing import Optional
 
 import aiosqlite
 
@@ -14,7 +13,7 @@ class Database:
 
     def __init__(self, db_path: str = "levity.db"):
         self.db_path = db_path
-        self.connection: Optional[aiosqlite.Connection] = None
+        self.connection: aiosqlite.Connection | None = None
 
     async def connect(self) -> aiosqlite.Connection:
         """Establish database connection."""

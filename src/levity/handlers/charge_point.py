@@ -1,25 +1,24 @@
 """OCPP Charge Point handler with database integration."""
 
 import logging
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 import aiosqlite
-from ocpp.routing import on, after
+from ocpp.routing import after, on
 from ocpp.v16 import ChargePoint as BaseChargePoint
-from ocpp.v16 import call, call_result
+from ocpp.v16 import call_result
 from ocpp.v16.enums import (
     Action,
-    RegistrationStatus,
     ChargePointStatus,
+    RegistrationStatus,
 )
 
-from ..models import ChargePoint, Connector, Transaction, MeterValue
+from ..models import ChargePoint, Connector, MeterValue, Transaction
 from ..repositories import (
     ChargePointRepository,
     ConnectorRepository,
-    TransactionRepository,
     MeterValueRepository,
+    TransactionRepository,
 )
 
 logger = logging.getLogger(__name__)
@@ -52,9 +51,7 @@ class LevityChargePoint(BaseChargePoint):
 
         Creates or updates the charge point record in the database.
         """
-        logger.info(
-            f"BootNotification from {self.id}: {charge_point_vendor} {charge_point_model}"
-        )
+        logger.info(f"BootNotification from {self.id}: {charge_point_vendor} {charge_point_model}")
 
         # Extract optional fields
         serial_number = kwargs.get("charge_point_serial_number", "")
@@ -72,13 +69,13 @@ class LevityChargePoint(BaseChargePoint):
             iccid=iccid,
             imsi=imsi,
             is_connected=True,
-            last_boot_at=datetime.now(timezone.utc),
+            last_boot_at=datetime.now(UTC),
         )
 
         await self.cp_repo.upsert(cp)
 
         return call_result.BootNotification(
-            current_time=datetime.now(timezone.utc).isoformat(),
+            current_time=datetime.now(UTC).isoformat(),
             interval=60,  # Heartbeat interval in seconds
             status=RegistrationStatus.accepted,
         )
@@ -92,11 +89,9 @@ class LevityChargePoint(BaseChargePoint):
         """
         logger.debug(f"Heartbeat from {self.id}")
 
-        await self.cp_repo.update_heartbeat(self.id, datetime.now(timezone.utc))
+        await self.cp_repo.update_heartbeat(self.id, datetime.now(UTC))
 
-        return call_result.Heartbeat(
-            current_time=datetime.now(timezone.utc).isoformat()
-        )
+        return call_result.Heartbeat(current_time=datetime.now(UTC).isoformat())
 
     @on(Action.status_notification)
     async def on_status_notification(
@@ -108,9 +103,7 @@ class LevityChargePoint(BaseChargePoint):
         Updates connector status in the database. If connector_id is 0,
         updates the charge point status instead.
         """
-        logger.info(
-            f"StatusNotification from {self.id}, connector {connector_id}: {status}"
-        )
+        logger.info(f"StatusNotification from {self.id}, connector {connector_id}: {status}")
 
         vendor_error_code = kwargs.get("vendor_error_code", "")
 
@@ -139,9 +132,7 @@ class LevityChargePoint(BaseChargePoint):
 
         Creates a new transaction record in the database.
         """
-        logger.info(
-            f"StartTransaction from {self.id}, connector {connector_id}, tag {id_tag}"
-        )
+        logger.info(f"StartTransaction from {self.id}, connector {connector_id}, tag {id_tag}")
 
         # Get connector database ID
         connector = await self.conn_repo.get_by_cp_and_connector(self.id, connector_id)
@@ -201,12 +192,9 @@ class LevityChargePoint(BaseChargePoint):
 
         stop_time = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
         reason = kwargs.get("reason", "")
-        id_tag = kwargs.get("id_tag")
 
         # Stop the transaction
-        await self.tx_repo.stop_transaction(
-            transaction_id, stop_time, meter_stop, reason
-        )
+        await self.tx_repo.stop_transaction(transaction_id, stop_time, meter_stop, reason)
 
         # Update charge point last transaction time
         await self.cp_repo.upsert(
@@ -220,16 +208,12 @@ class LevityChargePoint(BaseChargePoint):
         # Process transaction data if present
         transaction_data = kwargs.get("transaction_data", [])
         if transaction_data:
-            await self._process_meter_values(
-                transaction_id, self.id, transaction_data
-            )
+            await self._process_meter_values(transaction_id, self.id, transaction_data)
 
         return call_result.StopTransaction(id_tag_info={"status": "Accepted"})
 
     @on(Action.meter_values)
-    async def on_meter_values(
-        self, connector_id: int, meter_value: list, **kwargs
-    ):
+    async def on_meter_values(self, connector_id: int, meter_value: list, **kwargs):
         """
         Handle MeterValues message.
 
@@ -247,18 +231,16 @@ class LevityChargePoint(BaseChargePoint):
 
     async def _process_meter_values(
         self,
-        transaction_id: Optional[int],
+        transaction_id: int | None,
         cp_id: str,
         meter_data: list,
-        connector_id: Optional[int] = None,
+        connector_id: int | None = None,
     ):
         """Process and store meter values from transaction data or MeterValues message."""
         meter_values = []
 
         for sample in meter_data:
-            timestamp = datetime.fromisoformat(
-                sample.get("timestamp", "").replace("Z", "+00:00")
-            )
+            timestamp = datetime.fromisoformat(sample.get("timestamp", "").replace("Z", "+00:00"))
             sampled_values = sample.get("sampled_value", [])
 
             for value in sampled_values:

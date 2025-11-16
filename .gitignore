@@ -9,5 +9,12 @@ wheels/
 # Virtual environments
 .venv
 
+# Database and logs
+*.db
+*.log
+
+# Backups
+*.bak
+
 # Other
 .DS_Store

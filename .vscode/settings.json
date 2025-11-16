@@ -1,4 +1,5 @@
 {
 
-    "claudeCode.allowDangerouslySkipPermissions": true
+    "claudeCode.allowDangerouslySkipPermissions": true,
+    "makefile.configureOnOpen": false
 }

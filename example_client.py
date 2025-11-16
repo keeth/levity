@@ -8,17 +8,16 @@ sends a BootNotification, Heartbeat, and StatusNotification.
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import websockets
-from ocpp.v16 import ChargePoint as cp
-from ocpp.v16 import call
+from ocpp.v16 import ChargePoint, call
 from ocpp.v16.enums import ChargePointStatus
 
 logging.basicConfig(level=logging.INFO)
 
 
-class TestChargePoint(cp):
+class TestChargePoint(ChargePoint):
     """Simple test charge point implementation."""
 
     async def send_boot_notification(self):
@@ -32,7 +31,7 @@ class TestChargePoint(cp):
         response = await self.call(request)
 
         if response.status == "Accepted":
-            print(f"✓ Connected to central system")
+            print("✓ Connected to central system")
             print(f"  Heartbeat interval: {response.interval}s")
             print(f"  Server time: {response.current_time}")
 
@@ -62,7 +61,7 @@ class TestChargePoint(cp):
             connector_id=connector_id,
             id_tag=id_tag,
             meter_start=0,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         )
         response = await self.call(request)
         print(f"✓ Transaction started: ID={response.transaction_id}")
@@ -75,7 +74,7 @@ class TestChargePoint(cp):
             transaction_id=transaction_id,
             meter_value=[
                 {
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                     "sampled_value": [
                         {
                             "value": "1500",
@@ -88,7 +87,7 @@ class TestChargePoint(cp):
             ],
         )
         response = await self.call(request)
-        print(f"✓ Meter values sent")
+        print("✓ Meter values sent")
         return response
 
     async def send_stop_transaction(self, transaction_id: int, meter_stop: int):
@@ -96,7 +95,7 @@ class TestChargePoint(cp):
         request = call.StopTransaction(
             transaction_id=transaction_id,
             meter_stop=meter_stop,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         )
         response = await self.call(request)
         print(f"✓ Transaction stopped: ID={transaction_id}")
@@ -108,23 +107,23 @@ async def main():
     charge_point_id = "TEST_CP_001"
     server_url = "ws://localhost:9000"
 
-    print(f"\n{'='*60}")
-    print(f"Levity OCPP Test Client")
-    print(f"{'='*60}")
+    print(f"\n{'=' * 60}")
+    print("Levity OCPP Test Client")
+    print(f"{'=' * 60}")
     print(f"Charge Point ID: {charge_point_id}")
     print(f"Server URL: {server_url}/ws/{charge_point_id}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     async with websockets.connect(
         f"{server_url}/ws/{charge_point_id}",
         subprotocols=["ocpp1.6"],
     ) as ws:
-        cp = TestChargePoint(charge_point_id, ws)
+        charge_point = TestChargePoint(charge_point_id, ws)
 
         # Start the ChargePoint in the background
         await asyncio.gather(
-            cp.start(),
-            simulate_charging_session(cp),
+            charge_point.start(),
+            simulate_charging_session(charge_point),
         )
 
 
@@ -162,7 +161,7 @@ async def simulate_charging_session(cp: TestChargePoint):
         await cp.send_status_notification(1, ChargePointStatus.charging)
 
         # Send some meter values during charging
-        for i in range(3):
+        for _ in range(3):
             await asyncio.sleep(2)
             await cp.send_meter_values(1, transaction_id)
 
@@ -182,9 +181,9 @@ async def simulate_charging_session(cp: TestChargePoint):
         print("\n8. Sending final heartbeat...")
         await cp.send_heartbeat()
 
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("✓ Test completed successfully!")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
     except Exception as e:
         print(f"\n✗ Error during test: {e}")

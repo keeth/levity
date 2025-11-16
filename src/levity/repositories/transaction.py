@@ -1,7 +1,6 @@
 """Repository for transaction operations."""
 
 from datetime import datetime
-from typing import Optional
 
 from ..models import Transaction
 from .base import BaseRepository
@@ -37,23 +36,21 @@ class TransactionRepository(BaseRepository):
         tx.id = row["id"] if row else None
         return tx
 
-    async def get_by_id(self, tx_id: int) -> Optional[Transaction]:
+    async def get_by_id(self, tx_id: int) -> Transaction | None:
         """Get transaction by database ID."""
         row = await self._fetchone("SELECT * FROM tx WHERE id = ?", (tx_id,))
         if row:
             return self._row_to_model(row)
         return None
 
-    async def get_by_ocpp_tx_id(self, ocpp_tx_id: int) -> Optional[Transaction]:
+    async def get_by_ocpp_tx_id(self, ocpp_tx_id: int) -> Transaction | None:
         """Get transaction by OCPP transaction ID."""
         row = await self._fetchone("SELECT * FROM tx WHERE tx_id = ?", (ocpp_tx_id,))
         if row:
             return self._row_to_model(row)
         return None
 
-    async def get_active_for_connector(
-        self, cp_id: str, cp_conn_id: int
-    ) -> Optional[Transaction]:
+    async def get_active_for_connector(self, cp_id: str, cp_conn_id: int) -> Transaction | None:
         """Get active transaction for a connector."""
         row = await self._fetchone(
             """
@@ -86,9 +83,7 @@ class TransactionRepository(BaseRepository):
                 updated_at = CURRENT_TIMESTAMP
             WHERE tx_id = ?
         """
-        await self._execute(
-            query, (stop_time, meter_stop, meter_stop, stop_reason, ocpp_tx_id)
-        )
+        await self._execute(query, (stop_time, meter_stop, meter_stop, stop_reason, ocpp_tx_id))
 
     async def get_all_for_cp(self, cp_id: str, limit: int = 100) -> list[Transaction]:
         """Get transactions for a charge point."""
