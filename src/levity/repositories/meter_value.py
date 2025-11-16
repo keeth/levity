@@ -96,6 +96,21 @@ class MeterValueRepository(BaseRepository):
         )
         return [self._row_to_model(row) for row in rows]
 
+    async def get_last_for_transaction(self, tx_id: int) -> MeterValue | None:
+        """Get the last (most recent) meter value for a transaction."""
+        row = await self._fetchone(
+            """
+            SELECT * FROM meter_val
+            WHERE tx_id = ?
+            ORDER BY timestamp DESC
+            LIMIT 1
+            """,
+            (tx_id,),
+        )
+        if row:
+            return self._row_to_model(row)
+        return None
+
     def _row_to_model(self, row) -> MeterValue:
         """Convert database row to MeterValue model."""
         return MeterValue(

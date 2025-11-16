@@ -103,6 +103,18 @@ class TransactionRepository(BaseRepository):
         )
         return [self._row_to_model(row) for row in rows]
 
+    async def get_all_active_for_cp(self, cp_id: str) -> list[Transaction]:
+        """Get all active (unclosed) transactions for a charge point."""
+        rows = await self._fetchall(
+            """
+            SELECT * FROM tx
+            WHERE cp_id = ? AND status = 'Active'
+            ORDER BY start_time ASC
+            """,
+            (cp_id,),
+        )
+        return [self._row_to_model(row) for row in rows]
+
     def _row_to_model(self, row) -> Transaction:
         """Convert database row to Transaction model."""
         return Transaction(

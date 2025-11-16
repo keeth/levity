@@ -2,12 +2,14 @@
 
 import asyncio
 import logging
+from typing import Callable
 
 import websockets
 from websockets.asyncio.server import ServerConnection
 
 from .database import Database
 from .handlers import LevityChargePoint
+from .plugins.base import ChargePointPlugin
 
 logger = logging.getLogger(__name__)
 
@@ -18,13 +20,22 @@ class OCPPServer:
 
     The server accepts connections at /ws/{charge_point_id} and creates
     a LevityChargePoint instance for each connection to handle OCPP messages.
+
+    Supports a plugin system for extending charge point behavior.
     """
 
-    def __init__(self, db: Database, host: str = "0.0.0.0", port: int = 9000):
+    def __init__(
+        self,
+        db: Database,
+        host: str = "0.0.0.0",
+        port: int = 9000,
+        plugin_factory: Callable[[], list[ChargePointPlugin]] | None = None,
+    ):
         self.db = db
         self.host = host
         self.port = port
         self.charge_points: dict[str, LevityChargePoint] = {}
+        self.plugin_factory = plugin_factory or (lambda: [])
 
     async def on_connect(self, connection: ServerConnection):
         """
@@ -56,9 +67,23 @@ class OCPPServer:
         # Get database connection
         db_conn = await self.db.connect()
 
-        # Create ChargePoint instance
-        charge_point = LevityChargePoint(charge_point_id, connection, db_conn)
+        # Create plugins for this charge point
+        plugins = self.plugin_factory()
+
+        # Create ChargePoint instance with plugins
+        charge_point = LevityChargePoint(charge_point_id, connection, db_conn, plugins)
         self.charge_points[charge_point_id] = charge_point
+
+        # Initialize plugins
+        for plugin in plugins:
+            try:
+                await plugin.initialize(charge_point)
+            except Exception as e:
+                logger.error(
+                    f"Failed to initialize plugin {plugin.__class__.__name__} "
+                    f"for CP {charge_point_id}: {e}",
+                    exc_info=True,
+                )
 
         try:
             # Get current timestamp from database

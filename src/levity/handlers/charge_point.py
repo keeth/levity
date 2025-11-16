@@ -14,6 +14,7 @@ from ocpp.v16.enums import (
 )
 
 from ..models import ChargePoint, Connector, MeterValue, Transaction
+from ..plugins.base import ChargePointPlugin, PluginContext, PluginHook
 from ..repositories import (
     ChargePointRepository,
     ConnectorRepository,
@@ -30,9 +31,17 @@ class LevityChargePoint(BaseChargePoint):
 
     Handles incoming OCPP messages from charge points and persists
     relevant data to the database.
+
+    Supports a plugin system for extending behavior at various lifecycle hooks.
     """
 
-    def __init__(self, id: str, connection, db_connection: aiosqlite.Connection):
+    def __init__(
+        self,
+        id: str,
+        connection,
+        db_connection: aiosqlite.Connection,
+        plugins: list[ChargePointPlugin] | None = None,
+    ):
         super().__init__(id, connection)
         self.db = db_connection
 
@@ -41,6 +50,11 @@ class LevityChargePoint(BaseChargePoint):
         self.conn_repo = ConnectorRepository(db_connection)
         self.tx_repo = TransactionRepository(db_connection)
         self.meter_repo = MeterValueRepository(db_connection)
+
+        # Initialize plugin system
+        self.plugins: list[ChargePointPlugin] = plugins or []
+        self._plugin_hooks: dict[PluginHook, list[tuple[ChargePointPlugin, str]]] = {}
+        self._register_plugins()
 
     @on(Action.boot_notification)
     async def on_boot_notification(
@@ -52,6 +66,14 @@ class LevityChargePoint(BaseChargePoint):
         Creates or updates the charge point record in the database.
         """
         logger.info(f"BootNotification from {self.id}: {charge_point_vendor} {charge_point_model}")
+
+        # Execute BEFORE hooks
+        message_data = {
+            "charge_point_vendor": charge_point_vendor,
+            "charge_point_model": charge_point_model,
+            **kwargs,
+        }
+        await self._execute_plugin_hooks(PluginHook.BEFORE_BOOT_NOTIFICATION, message_data)
 
         # Extract optional fields
         serial_number = kwargs.get("charge_point_serial_number", "")
@@ -74,11 +96,16 @@ class LevityChargePoint(BaseChargePoint):
 
         await self.cp_repo.upsert(cp)
 
-        return call_result.BootNotification(
+        result = call_result.BootNotification(
             current_time=datetime.now(UTC).isoformat(),
             interval=60,  # Heartbeat interval in seconds
             status=RegistrationStatus.accepted,
         )
+
+        # Execute AFTER hooks
+        await self._execute_plugin_hooks(PluginHook.AFTER_BOOT_NOTIFICATION, message_data, result)
+
+        return result
 
     @on(Action.heartbeat)
     async def on_heartbeat(self):
@@ -105,6 +132,15 @@ class LevityChargePoint(BaseChargePoint):
         """
         logger.info(f"StatusNotification from {self.id}, connector {connector_id}: {status}")
 
+        # Execute BEFORE hooks
+        message_data = {
+            "connector_id": connector_id,
+            "error_code": error_code,
+            "status": status,
+            **kwargs,
+        }
+        await self._execute_plugin_hooks(PluginHook.BEFORE_STATUS_NOTIFICATION, message_data)
+
         vendor_error_code = kwargs.get("vendor_error_code", "")
 
         if connector_id == 0:
@@ -121,7 +157,12 @@ class LevityChargePoint(BaseChargePoint):
             )
             await self.conn_repo.upsert(connector)
 
-        return call_result.StatusNotification()
+        result = call_result.StatusNotification()
+
+        # Execute AFTER hooks
+        await self._execute_plugin_hooks(PluginHook.AFTER_STATUS_NOTIFICATION, message_data, result)
+
+        return result
 
     @on(Action.start_transaction)
     async def on_start_transaction(
@@ -133,6 +174,16 @@ class LevityChargePoint(BaseChargePoint):
         Creates a new transaction record in the database.
         """
         logger.info(f"StartTransaction from {self.id}, connector {connector_id}, tag {id_tag}")
+
+        # Execute BEFORE hooks (orphaned transaction cleanup happens here)
+        message_data = {
+            "connector_id": connector_id,
+            "id_tag": id_tag,
+            "meter_start": meter_start,
+            "timestamp": timestamp,
+            **kwargs,
+        }
+        await self._execute_plugin_hooks(PluginHook.BEFORE_START_TRANSACTION, message_data)
 
         # Get connector database ID
         connector = await self.conn_repo.get_by_cp_and_connector(self.id, connector_id)
@@ -171,9 +222,14 @@ class LevityChargePoint(BaseChargePoint):
         )
 
         # Use database ID as OCPP transaction ID
-        return call_result.StartTransaction(
+        result = call_result.StartTransaction(
             transaction_id=tx.id, id_tag_info={"status": "Accepted"}
         )
+
+        # Execute AFTER hooks
+        await self._execute_plugin_hooks(PluginHook.AFTER_START_TRANSACTION, message_data, result)
+
+        return result
 
     @on(Action.stop_transaction)
     async def on_stop_transaction(
@@ -279,7 +335,6 @@ class LevityChargePoint(BaseChargePoint):
         logger.info(f"Authorize request from {self.id} for tag {id_tag}")
 
         # For now, accept all authorizations
-        # In production, check id_tag against authorized users
         return call_result.Authorize(id_tag_info={"status": "Accepted"})
 
     @after(Action.boot_notification)
@@ -293,3 +348,64 @@ class LevityChargePoint(BaseChargePoint):
         """Handle charge point disconnection."""
         logger.info(f"Charge point {self.id} disconnected")
         await self.cp_repo.update_connection_status(self.id, False)
+
+        # Cleanup plugins
+        for plugin in self.plugins:
+            try:
+                await plugin.cleanup(self)
+            except Exception as e:
+                logger.error(f"Error cleaning up plugin {plugin.__class__.__name__}: {e}")
+
+    def _register_plugins(self):
+        """Register all plugins and build hook mapping."""
+        for plugin in self.plugins:
+            try:
+                hooks = plugin.hooks()
+                for hook, method_name in hooks.items():
+                    if hook not in self._plugin_hooks:
+                        self._plugin_hooks[hook] = []
+                    self._plugin_hooks[hook].append((plugin, method_name))
+
+                logger.info(
+                    f"Registered plugin {plugin.__class__.__name__} "
+                    f"with {len(hooks)} hook(s) for CP {self.id}"
+                )
+            except Exception as e:
+                logger.error(
+                    f"Failed to register plugin {plugin.__class__.__name__}: {e}",
+                    exc_info=True,
+                )
+
+    async def _execute_plugin_hooks(
+        self,
+        hook: PluginHook,
+        message_data: dict,
+        result=None,
+    ):
+        """
+        Execute all registered plugin hooks for a given lifecycle point.
+
+        Args:
+            hook: The hook point to execute
+            message_data: The message data (kwargs from OCPP handler)
+            result: The result from the handler (for AFTER hooks)
+        """
+        if hook not in self._plugin_hooks:
+            return
+
+        context = PluginContext(
+            charge_point=self,
+            message_data=message_data,
+            result=result,
+        )
+
+        for plugin, method_name in self._plugin_hooks[hook]:
+            try:
+                method = getattr(plugin, method_name)
+                await method(context)
+            except Exception as e:
+                logger.error(
+                    f"Error executing {plugin.__class__.__name__}.{method_name} "
+                    f"for hook {hook.value}: {e}",
+                    exc_info=True,
+                )
