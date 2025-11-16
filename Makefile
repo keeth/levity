@@ -1,4 +1,4 @@
-.PHONY: help install dev run test lint format check clean
+.PHONY: help install dev run test test-unit test-integration test-ws example lint format check clean
 
 help:  ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -12,22 +12,35 @@ dev:  ## Install in development mode
 run:  ## Run the server
 	uv run levity
 
-test:  ## Run the example test client
+test:  ## Run all tests
+	uv run pytest tests/ -v
+
+test-unit:  ## Run unit tests only
+	uv run pytest tests/ -v -m unit
+
+test-integration:  ## Run integration tests only
+	uv run pytest tests/ -v -m integration
+
+test-ws:  ## Run WebSocket tests only
+	uv run pytest tests/ -v -m websocket
+
+example:  ## Run the example test client
 	uv run python example_client.py
 
 lint:  ## Run linting checks
-	uv run ruff check src/ example_client.py
+	uv run ruff check src/ tests/ example_client.py
 
 format:  ## Format code
-	uv run ruff format src/ example_client.py
+	uv run ruff format src/ tests/ example_client.py
 
-check:  ## Run all checks (lint + format check)
-	uv run ruff check src/ example_client.py
-	uv run ruff format --check src/ example_client.py
+check:  ## Run all checks (lint + format check + tests)
+	uv run ruff check src/ tests/ example_client.py
+	uv run ruff format --check src/ tests/ example_client.py
+	uv run pytest tests/ -v
 
 fix:  ## Auto-fix linting issues
-	uv run ruff check --fix src/ example_client.py
-	uv run ruff format src/ example_client.py
+	uv run ruff check --fix src/ tests/ example_client.py
+	uv run ruff format src/ tests/ example_client.py
 
 clean:  ## Clean up generated files
 	rm -rf build/

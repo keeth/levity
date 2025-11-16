@@ -22,6 +22,8 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "pytest>=9.0.1",
+    "pytest-asyncio>=1.3.0",
     "ruff>=0.14.5",
 ]
 
@@ -85,6 +87,8 @@ ignore = [
 "__init__.py" = ["F401"]
 # Allow print statements in example_client.py
 "example_client.py" = ["T201"]
+# Test files can have longer functions and classes, imports anywhere, and use try-except-pass
+"tests/**/*.py" = ["PLR0915", "PLC0415", "SIM105"]
 
 [tool.ruff.format]
 # Use double quotes for strings
@@ -95,3 +99,22 @@ indent-style = "space"
 skip-magic-trailing-comma = false
 # Auto-detect line ending
 line-ending = "auto"
+
+[tool.pytest.ini_options]
+# Pytest configuration
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--strict-markers",
+    "--tb=short",
+]
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "websocket: WebSocket tests",
+]

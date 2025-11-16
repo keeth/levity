@@ -150,6 +150,31 @@ asyncio.run(test_client())
 
 ## Development
 
+### Testing
+
+The project includes comprehensive unit and integration tests using pytest.
+
+```bash
+# Run all tests
+make test
+
+# Run only unit tests (fast)
+make test-unit
+
+# Run only integration tests
+make test-integration
+
+# Run only WebSocket tests
+make test-ws
+
+# Or directly with pytest
+uv run pytest tests/ -v
+uv run pytest tests/ -v -m unit
+uv run pytest tests/ -v -k test_upsert
+```
+
+Test fixtures automatically provision fresh SQLite databases for each test, ensuring isolation.
+
 ### Code Quality
 
 This project uses [Ruff](https://docs.astral.sh/ruff/) for linting and formatting.
@@ -159,12 +184,12 @@ This project uses [Ruff](https://docs.astral.sh/ruff/) for linting and formattin
 make lint         # Run linting checks
 make format       # Format code
 make fix          # Auto-fix issues and format
-make check        # Run all checks
+make check        # Run all checks (lint + format + tests)
 
 # Or directly with uv
-uv run ruff check src/ example_client.py
-uv run ruff check --fix src/ example_client.py
-uv run ruff format src/ example_client.py
+uv run ruff check src/ tests/ example_client.py
+uv run ruff check --fix src/ tests/ example_client.py
+uv run ruff format src/ tests/ example_client.py
 ```
 
 See `make help` for all available commands.

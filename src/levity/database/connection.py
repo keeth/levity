@@ -34,6 +34,16 @@ class Database:
         """Initialize database schema from SQL file."""
         conn = await self.connect()
 
+        # Check if schema already exists
+        cursor = await conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='cp'"
+        )
+        table_exists = await cursor.fetchone()
+
+        if table_exists:
+            logger.debug("Database schema already exists, skipping initialization")
+            return
+
         schema_file = Path(schema_path)
         if not schema_file.exists():
             raise FileNotFoundError(f"Schema file not found: {schema_path}")

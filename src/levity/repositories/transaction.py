@@ -16,10 +16,9 @@ class TransactionRepository(BaseRepository):
                 tx_id, cp_id, cp_conn_id, id_tag, start_time,
                 meter_start, status
             ) VALUES (?, ?, ?, ?, ?, ?, ?)
-            RETURNING id
         """
 
-        cursor = await self._execute(
+        await self._execute(
             query,
             (
                 tx.tx_id,
@@ -32,8 +31,10 @@ class TransactionRepository(BaseRepository):
             ),
         )
 
+        # Get the last inserted row ID
+        cursor = await self.conn.execute("SELECT last_insert_rowid()")
         row = await cursor.fetchone()
-        tx.id = row["id"] if row else None
+        tx.id = row[0] if row else None
         return tx
 
     async def get_by_id(self, tx_id: int) -> Transaction | None:
