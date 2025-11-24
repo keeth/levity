@@ -47,7 +47,7 @@ class Command(BaseCommand):
                         tx.charge_point,
                         tx.started_at.astimezone(tz).strftime(DATETIME_FORMAT),
                         tx.stopped_at.astimezone(tz).strftime(DATETIME_FORMAT),
-                        tx.meter_stop,
+                        tx.meter_stop - tx.meter_start,
                         tx.meter_correction,
                         tx.stop_reason,
                     ]
