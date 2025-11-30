@@ -1,12 +1,20 @@
 """Main entry point for Levity OCPP Central System."""
 
+import sys
+from pathlib import Path
+
+# Add src directory to Python path when running directly (not as installed package)
+if __package__ is None:
+    src_dir = Path(__file__).parent.parent.parent
+    if str(src_dir) not in sys.path:
+        sys.path.insert(0, str(src_dir))
+
 import argparse
 import asyncio
 import logging
-import sys
 
-from .database import Database
-from .server import OCPPServer
+from levity.database import Database
+from levity.server import OCPPServer
 
 
 def setup_logging(level: str = "INFO"):
