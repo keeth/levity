@@ -54,6 +54,12 @@ async def main():
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         help="Logging level (default: INFO)",
     )
+    parser.add_argument(
+        "--metrics-port",
+        type=int,
+        default=None,
+        help="Port for Prometheus metrics HTTP server (default: disabled)",
+    )
 
     args = parser.parse_args()
 
@@ -64,12 +70,16 @@ async def main():
     logger.info("Starting Levity OCPP Central System")
     logger.info(f"Database: {args.db}")
     logger.info(f"WebSocket endpoint: ws://{args.host}:{args.port}/ws/{{cp_id}}")
+    if args.metrics_port:
+        logger.info(f"Metrics endpoint: http://{args.host}:{args.metrics_port}/metrics")
 
     # Initialize database
     db = Database(args.db)
 
     # Create and start server
-    server = OCPPServer(db, host=args.host, port=args.port)
+    server = OCPPServer(
+        db, host=args.host, port=args.port, metrics_port=args.metrics_port
+    )
 
     try:
         await server.start()

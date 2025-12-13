@@ -140,7 +140,7 @@ class OCPPServer:
     async def metrics_handler(self, request):
         """Handle /metrics endpoint for Prometheus."""
         metrics = generate_latest()
-        return web.Response(body=metrics, content_type="text/plain; charset=utf-8")
+        return web.Response(body=metrics, content_type="text/plain")
 
     async def start_metrics_server(self):
         """Start the HTTP server for Prometheus metrics."""
