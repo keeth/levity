@@ -50,48 +50,51 @@ class OCPPServer:
         Extracts charge point ID from the URL path and creates a
         LevityChargePoint instance to handle OCPP messages.
         """
-        # Extract charge point ID from path: /ws/{charge_point_id}
-        path_parts = connection.request.path.strip("/").split("/")
-
-        if len(path_parts) != 2 or path_parts[0] != "ws":
-            logger.warning(
-                f"Invalid connection path: {connection.request.path}. "
-                "Expected format: /ws/{{charge_point_id}}"
-            )
-            await connection.close(1002, "Invalid path format")
-            return
-
-        charge_point_id = path_parts[1]
-
-        if not charge_point_id:
-            logger.warning("Empty charge point ID in connection path")
-            await connection.close(1002, "Missing charge point ID")
-            return
-
-        logger.info(f"Charge point {charge_point_id} connecting...")
-
-        # Get database connection
-        db_conn = await self.db.connect()
-
-        # Create plugins for this charge point
-        plugins = self.plugin_factory()
-
-        # Create ChargePoint instance with plugins
-        charge_point = LevityChargePoint(charge_point_id, connection, db_conn, plugins)
-        self.charge_points[charge_point_id] = charge_point
-
-        # Initialize plugins
-        for plugin in plugins:
-            try:
-                await plugin.initialize(charge_point)
-            except Exception as e:
-                logger.error(
-                    f"Failed to initialize plugin {plugin.__class__.__name__} "
-                    f"for CP {charge_point_id}: {e}",
-                    exc_info=True,
-                )
+        charge_point_id = None
+        charge_point = None
 
         try:
+            # Extract charge point ID from path: /ws/{charge_point_id}
+            path_parts = connection.request.path.strip("/").split("/")
+
+            if len(path_parts) != 2 or path_parts[0] != "ws":
+                logger.warning(
+                    f"Invalid connection path: {connection.request.path}. "
+                    "Expected format: /ws/{{charge_point_id}}"
+                )
+                await connection.close(1002, "Invalid path format")
+                return
+
+            charge_point_id = path_parts[1]
+
+            if not charge_point_id:
+                logger.warning("Empty charge point ID in connection path")
+                await connection.close(1002, "Missing charge point ID")
+                return
+
+            logger.info(f"Charge point {charge_point_id} connecting...")
+
+            # Get database connection
+            db_conn = await self.db.connect()
+
+            # Create plugins for this charge point
+            plugins = self.plugin_factory()
+
+            # Create ChargePoint instance with plugins
+            charge_point = LevityChargePoint(charge_point_id, connection, db_conn, plugins)
+            self.charge_points[charge_point_id] = charge_point
+
+            # Initialize plugins
+            for plugin in plugins:
+                try:
+                    await plugin.initialize(charge_point)
+                except Exception as e:
+                    logger.error(
+                        f"Failed to initialize plugin {plugin.__class__.__name__} "
+                        f"for CP {charge_point_id}: {e}",
+                        exc_info=True,
+                    )
+
             # Get current timestamp from database
             cursor = await charge_point.cp_repo.conn.execute("SELECT datetime('now')")
             row = await cursor.fetchone()
@@ -112,13 +115,27 @@ class OCPPServer:
         except websockets.exceptions.ConnectionClosed:
             logger.info(f"Charge point {charge_point_id} connection closed")
         except Exception as e:
-            logger.error(f"Error handling charge point {charge_point_id}: {e}", exc_info=True)
+            logger.error(
+                f"Error handling charge point {charge_point_id}: {e}",
+                exc_info=True,
+            )
+            # Try to close the connection gracefully
+            try:
+                if connection.open:
+                    await connection.close(1011, "Internal server error")
+            except Exception:
+                pass
         finally:
             # Clean up on disconnect
-            await charge_point.on_disconnect()
-            if charge_point_id in self.charge_points:
+            if charge_point:
+                try:
+                    await charge_point.on_disconnect()
+                except Exception as e:
+                    logger.error(f"Error during disconnect cleanup for {charge_point_id}: {e}")
+            if charge_point_id and charge_point_id in self.charge_points:
                 del self.charge_points[charge_point_id]
-            logger.info(f"Charge point {charge_point_id} disconnected")
+            if charge_point_id:
+                logger.info(f"Charge point {charge_point_id} disconnected")
 
     async def metrics_handler(self, request):
         """Handle /metrics endpoint for Prometheus."""
@@ -147,21 +164,32 @@ class OCPPServer:
             await self.metrics_runner.cleanup()
             logger.info("Prometheus metrics server stopped")
 
-    async def process_request(self, path, request_headers):
+    def select_subprotocol(self, client_subprotocols, server_subprotocols):
         """
-        Process WebSocket handshake request.
+        Select subprotocol during WebSocket handshake.
 
-        Adds default subprotocol 'ocpp1.6' if the client doesn't send one.
+        Defaults to 'ocpp1.6' if client doesn't send any subprotocols.
         This allows chargers that don't send subprotocol headers to connect.
         """
-        # Check if Sec-WebSocket-Protocol header is missing or empty
-        if "Sec-WebSocket-Protocol" not in request_headers:
-            logger.debug(f"Missing subprotocol header for {path}, defaulting to ocpp1.6")
-            request_headers["Sec-WebSocket-Protocol"] = "ocpp1.6"
-        elif not request_headers.get("Sec-WebSocket-Protocol"):
-            logger.debug(f"Empty subprotocol header for {path}, defaulting to ocpp1.6")
-            request_headers["Sec-WebSocket-Protocol"] = "ocpp1.6"
-        # Returning None continues with normal handshake
+        try:
+            if client_subprotocols:
+                # Client sent subprotocols, check if ocpp1.6 is supported
+                if "ocpp1.6" in client_subprotocols:
+                    logger.debug("Client supports ocpp1.6, selecting it")
+                    return "ocpp1.6"
+                # Client sent subprotocols but not ocpp1.6
+                logger.warning(
+                    f"Client sent subprotocols {client_subprotocols} but ocpp1.6 not found. "
+                    "Defaulting to ocpp1.6 anyway."
+                )
+                return "ocpp1.6"
+            # Client didn't send any subprotocols, default to ocpp1.6
+            logger.debug("Client sent no subprotocols, defaulting to ocpp1.6")
+            return "ocpp1.6"
+        except Exception as e:
+            logger.error(f"Error in select_subprotocol: {e}", exc_info=True)
+            # Default to ocpp1.6 on error
+            return "ocpp1.6"
 
     async def start(self):
         """
@@ -183,7 +211,7 @@ class OCPPServer:
             self.host,
             self.port,
             subprotocols=["ocpp1.6"],
-            process_request=self.process_request,
+            select_subprotocol=self.select_subprotocol,
         ):
             logger.info(f"OCPP server listening on ws://{self.host}:{self.port}/ws/{{cp_id}}")
             await asyncio.Future()  # Run forever
