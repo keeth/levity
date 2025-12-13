@@ -56,6 +56,25 @@ class LevityChargePoint(BaseChargePoint):
         self._plugin_hooks: dict[PluginHook, list[tuple[ChargePointPlugin, str]]] = {}
         self._register_plugins()
 
+    async def _ensure_charge_point_exists(self):
+        """
+        Ensure charge point exists in database.
+
+        Upserts a minimal charge point record if it doesn't exist.
+        This prevents foreign key constraint errors when messages arrive
+        before BootNotification.
+        """
+        existing = await self.cp_repo.get_by_id(self.id)
+        if not existing:
+            # Create minimal charge point record
+            minimal_cp = ChargePoint(
+                id=self.id,
+                is_connected=True,
+                status="Unknown",
+            )
+            await self.cp_repo.upsert(minimal_cp)
+            logger.debug(f"Created minimal charge point record for {self.id}")
+
     @on(Action.boot_notification)
     async def on_boot_notification(
         self, charge_point_vendor: str, charge_point_model: str, **kwargs
@@ -116,6 +135,9 @@ class LevityChargePoint(BaseChargePoint):
         """
         logger.debug(f"Heartbeat from {self.id}")
 
+        # Ensure charge point exists before processing
+        await self._ensure_charge_point_exists()
+
         # Execute BEFORE hooks
         message_data = {}
         await self._execute_plugin_hooks(PluginHook.BEFORE_HEARTBEAT, message_data)
@@ -140,6 +162,9 @@ class LevityChargePoint(BaseChargePoint):
         updates the charge point status instead.
         """
         logger.info(f"StatusNotification from {self.id}, connector {connector_id}: {status}")
+
+        # Ensure charge point exists before processing
+        await self._ensure_charge_point_exists()
 
         # Execute BEFORE hooks
         message_data = {
@@ -183,6 +208,9 @@ class LevityChargePoint(BaseChargePoint):
         Creates a new transaction record in the database.
         """
         logger.info(f"StartTransaction from {self.id}, connector {connector_id}, tag {id_tag}")
+
+        # Ensure charge point exists before processing
+        await self._ensure_charge_point_exists()
 
         # Execute BEFORE hooks (orphaned transaction cleanup happens here)
         message_data = {
@@ -253,6 +281,8 @@ class LevityChargePoint(BaseChargePoint):
 
         Completes the transaction record in the database.
         """
+        # Ensure charge point exists before processing
+        await self._ensure_charge_point_exists()
         logger.info(f"StopTransaction from {self.id}, tx_id {transaction_id}")
 
         # Execute BEFORE hooks
@@ -298,6 +328,9 @@ class LevityChargePoint(BaseChargePoint):
 
         Stores meter value readings in the database.
         """
+        # Ensure charge point exists before processing
+        await self._ensure_charge_point_exists()
+
         transaction_id = kwargs.get("transaction_id")
         logger.debug(
             f"MeterValues from {self.id}, connector {connector_id}, "
@@ -368,6 +401,9 @@ class LevityChargePoint(BaseChargePoint):
         Basic implementation that accepts all tags. In production,
         you would validate against a database of authorized tags.
         """
+        # Ensure charge point exists before processing
+        await self._ensure_charge_point_exists()
+
         logger.info(f"Authorize request from {self.id} for tag {id_tag}")
 
         # Execute BEFORE hooks
