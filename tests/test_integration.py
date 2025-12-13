@@ -347,3 +347,46 @@ class TestOCPPIntegration:
             assert cp is not None
             assert cp.vendor == f"Vendor-{cp_id}"
             assert cp.last_heartbeat_at is not None
+
+    async def test_connection_without_subprotocol(self, ocpp_server, temp_db):
+        """
+        Test that server's select_subprotocol defaults to ocpp1.6 when client sends empty list.
+        
+        This simulates chargers that don't properly send subprotocol headers.
+        The server's select_subprotocol method receives an empty list and defaults to ocpp1.6.
+        Note: The websockets client library requires us to accept the server's selected
+        subprotocol, so we pass subprotocols=["ocpp1.6"] to match what the server selects.
+        """
+        cp_id = "TEST_CP_NO_SUBPROTOCOL"
+
+        # The server's select_subprotocol will receive an empty list and default to ocpp1.6
+        # We need to accept "ocpp1.6" in the client to match the server's selection
+        async with websockets.connect(
+            f"ws://127.0.0.1:19000/ws/{cp_id}",
+            subprotocols=["ocpp1.6"],  # Accept server's default selection
+        ) as ws:
+            client = MockOCPPClient(cp_id, ws)
+            client_task = asyncio.create_task(client.start())
+
+            # Send BootNotification to verify connection works
+            response = await client.send_boot_notification("TestVendor", "TestModel")
+
+            assert response.status == "Accepted"
+            assert response.interval == 60
+
+            # Verify data in database
+            conn = await temp_db.connect()
+            repo = ChargePointRepository(conn)
+            cp = await repo.get_by_id(cp_id)
+
+            assert cp is not None
+            assert cp.vendor == "TestVendor"
+            assert cp.model == "TestModel"
+            assert cp.is_connected is True
+
+            # Cleanup
+            client_task.cancel()
+            try:
+                await client_task
+            except asyncio.CancelledError:
+                pass
