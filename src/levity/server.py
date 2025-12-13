@@ -3,6 +3,7 @@
 import asyncio
 import logging
 from collections.abc import Callable
+from contextlib import suppress
 
 import websockets
 from aiohttp import web
@@ -164,32 +165,34 @@ class OCPPServer:
             await self.metrics_runner.cleanup()
             logger.info("Prometheus metrics server stopped")
 
-    def select_subprotocol(self, client_subprotocols, server_subprotocols):
+    async def process_request(self, path, request_headers):
         """
-        Select subprotocol during WebSocket handshake.
+        Process WebSocket handshake request.
 
-        Defaults to 'ocpp1.6' if client doesn't send any subprotocols.
+        Adds default subprotocol 'ocpp1.6' if the client doesn't send one.
         This allows chargers that don't send subprotocol headers to connect.
         """
         try:
-            if client_subprotocols:
-                # Client sent subprotocols, check if ocpp1.6 is supported
-                if "ocpp1.6" in client_subprotocols:
-                    logger.debug("Client supports ocpp1.6, selecting it")
-                    return "ocpp1.6"
-                # Client sent subprotocols but not ocpp1.6
-                logger.warning(
-                    f"Client sent subprotocols {client_subprotocols} but ocpp1.6 not found. "
-                    "Defaulting to ocpp1.6 anyway."
-                )
-                return "ocpp1.6"
-            # Client didn't send any subprotocols, default to ocpp1.6
-            logger.debug("Client sent no subprotocols, defaulting to ocpp1.6")
-            return "ocpp1.6"
+            # Check if Sec-WebSocket-Protocol header is missing or empty
+            # Headers object behaves like a dict but may be case-insensitive
+            subprotocol = None
+            for key in request_headers:
+                if key.lower() == "sec-websocket-protocol":
+                    subprotocol = request_headers[key]
+                    break
+
+            if not subprotocol:
+                logger.debug(f"Missing or empty subprotocol header for {path}, defaulting to ocpp1.6")
+                # Add the header - Headers object supports dict-like assignment
+                request_headers["Sec-WebSocket-Protocol"] = "ocpp1.6"
+            else:
+                logger.debug(f"Subprotocol header present: {subprotocol} for {path}")
         except Exception as e:
-            logger.error(f"Error in select_subprotocol: {e}", exc_info=True)
-            # Default to ocpp1.6 on error
-            return "ocpp1.6"
+            logger.error(f"Error in process_request for {path}: {e}", exc_info=True)
+            # Try to add the header anyway as a fallback
+            with suppress(Exception):
+                request_headers["Sec-WebSocket-Protocol"] = "ocpp1.6"
+        # Returning None continues with normal handshake
 
     async def start(self):
         """
@@ -211,7 +214,7 @@ class OCPPServer:
             self.host,
             self.port,
             subprotocols=["ocpp1.6"],
-            select_subprotocol=self.select_subprotocol,
+            process_request=self.process_request,
         ):
             logger.info(f"OCPP server listening on ws://{self.host}:{self.port}/ws/{{cp_id}}")
             await asyncio.Future()  # Run forever
