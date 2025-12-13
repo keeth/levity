@@ -147,6 +147,22 @@ class OCPPServer:
             await self.metrics_runner.cleanup()
             logger.info("Prometheus metrics server stopped")
 
+    async def process_request(self, path, request_headers):
+        """
+        Process WebSocket handshake request.
+
+        Adds default subprotocol 'ocpp1.6' if the client doesn't send one.
+        This allows chargers that don't send subprotocol headers to connect.
+        """
+        # Check if Sec-WebSocket-Protocol header is missing or empty
+        if "Sec-WebSocket-Protocol" not in request_headers:
+            logger.debug(f"Missing subprotocol header for {path}, defaulting to ocpp1.6")
+            request_headers["Sec-WebSocket-Protocol"] = "ocpp1.6"
+        elif not request_headers.get("Sec-WebSocket-Protocol"):
+            logger.debug(f"Empty subprotocol header for {path}, defaulting to ocpp1.6")
+            request_headers["Sec-WebSocket-Protocol"] = "ocpp1.6"
+        # Returning None continues with normal handshake
+
     async def start(self):
         """
         Start the WebSocket server.
@@ -167,6 +183,7 @@ class OCPPServer:
             self.host,
             self.port,
             subprotocols=["ocpp1.6"],
+            process_request=self.process_request,
         ):
             logger.info(f"OCPP server listening on ws://{self.host}:{self.port}/ws/{{cp_id}}")
             await asyncio.Future()  # Run forever
