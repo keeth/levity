@@ -205,7 +205,9 @@ class TestOCPPIntegration:
             cp = await repo.get_by_id(cp_id)
             assert cp.vendor == "TestVendor"
             assert cp.model == "TestModel"
-            assert cp.status == "Unknown", "Status should remain Unknown (not updated by BootNotification)"
+            assert cp.status == "Unknown", (
+                "Status should remain Unknown (not updated by BootNotification)"
+            )
 
             # Cleanup
             client_task.cancel()
@@ -399,7 +401,7 @@ class TestOCPPIntegration:
     async def test_connection_without_subprotocol(self, ocpp_server, temp_db):
         """
         Test that server's select_subprotocol defaults to ocpp1.6 when client sends empty list.
-        
+
         This simulates chargers that don't properly send subprotocol headers.
         The server's select_subprotocol method receives an empty list and defaults to ocpp1.6.
         Note: The websockets client library requires us to accept the server's selected
@@ -478,7 +480,9 @@ class TestOCPPIntegration:
             cp = await repo.get_by_id(cp_id)
             assert cp.vendor == "TestVendor"
             assert cp.model == "TestModel"
-            assert cp.status == "Unknown", "Status should remain Unknown (not updated by BootNotification)"
+            assert cp.status == "Unknown", (
+                "Status should remain Unknown (not updated by BootNotification)"
+            )
 
             # Cleanup
             client_task.cancel()

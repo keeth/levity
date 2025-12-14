@@ -104,7 +104,12 @@ class LevityChargePoint(BaseChargePoint):
                     error_details=error_details,
                 )
         except Exception as e:
-            log_error(logger, "message_logging_error", f"Failed to log incoming message: {e}", cp_id=self.id)
+            log_error(
+                logger,
+                "message_logging_error",
+                f"Failed to log incoming message: {e}",
+                cp_id=self.id,
+            )
 
         return await super().route_message(raw_message)
 
@@ -123,7 +128,12 @@ class LevityChargePoint(BaseChargePoint):
                 payload=payload_dict,
             )
         except Exception as e:
-            log_error(logger, "message_logging_error", f"Failed to log outgoing message: {e}", cp_id=self.id)
+            log_error(
+                logger,
+                "message_logging_error",
+                f"Failed to log outgoing message: {e}",
+                cp_id=self.id,
+            )
 
         return await super().call(payload, suppress=suppress)
 

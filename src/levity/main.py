@@ -14,7 +14,7 @@ import asyncio
 import logging
 
 from levity.database import Database
-from levity.logging_utils import JSONFormatter
+from levity.logging_utils import JSONFormatter, log_error
 from levity.plugins import AutoRemoteStartPlugin, OrphanedTransactionPlugin
 from levity.server import OCPPServer
 
@@ -38,6 +38,7 @@ def setup_logging(level: str = "INFO"):
     # Suppress verbose logging from dependencies
     logging.getLogger("websockets").setLevel(logging.WARNING)
     logging.getLogger("aiohttp").setLevel(logging.WARNING)
+    logging.getLogger("ocpp").setLevel(logging.WARNING)
 
 
 async def main():
@@ -113,7 +114,9 @@ async def main():
             "event_data": {
                 "database": args.db,
                 "websocket_endpoint": f"ws://{args.host}:{args.port}/ws/{{cp_id}}",
-                "metrics_endpoint": f"http://{args.host}:{args.metrics_port}/metrics" if args.metrics_port else None,
+                "metrics_endpoint": f"http://{args.host}:{args.metrics_port}/metrics"
+                if args.metrics_port
+                else None,
             },
         },
     )
@@ -124,6 +127,7 @@ async def main():
     # Create plugin factory if auto-start is enabled
     plugin_factory = None
     if args.enable_auto_start:
+
         def create_plugins():
             return [
                 AutoRemoteStartPlugin(
@@ -132,6 +136,7 @@ async def main():
                 ),
                 OrphanedTransactionPlugin(),
             ]
+
         plugin_factory = create_plugins
 
     # Configure WebSocket ping interval (None disables pings)
@@ -156,8 +161,6 @@ async def main():
             extra={"event_type": "system_shutdown", "event_data": {"reason": "SIGINT"}},
         )
     except Exception as e:
-        from levity.logging_utils import log_error
-
         log_error(logger, "server_error", f"Server error: {e}", exc_info=e)
         raise
     finally:

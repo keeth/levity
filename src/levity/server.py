@@ -94,7 +94,11 @@ class OCPPServer:
 
             # Create ChargePoint instance with plugins
             charge_point = LevityChargePoint(
-                charge_point_id, connection, db_conn, plugins, heartbeat_interval=self.heartbeat_interval
+                charge_point_id,
+                connection,
+                db_conn,
+                plugins,
+                heartbeat_interval=self.heartbeat_interval,
             )
             self.charge_points[charge_point_id] = charge_point
 
@@ -128,7 +132,9 @@ class OCPPServer:
             await charge_point.start()
 
         except websockets.exceptions.ConnectionClosed:
-            log_websocket_event(logger, "disconnect", cp_id=charge_point_id, reason="connection_closed")
+            log_websocket_event(
+                logger, "disconnect", cp_id=charge_point_id, reason="connection_closed"
+            )
         except Exception as e:
             log_error(
                 logger,
@@ -184,8 +190,6 @@ class OCPPServer:
         """Stop the metrics HTTP server."""
         if self.metrics_runner:
             await self.metrics_runner.cleanup()
-
-
 
     def select_subprotocol(self, connection, subprotocols):
         """
