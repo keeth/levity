@@ -108,7 +108,7 @@ class LevityChargePoint(BaseChargePoint):
 
         return await super().route_message(raw_message)
 
-    async def call(self, payload, suppress=False, timeout=None):
+    async def call(self, payload, suppress=False):
         """Override to log outgoing OCPP CALL messages."""
         try:
             # Extract action from payload
@@ -125,7 +125,7 @@ class LevityChargePoint(BaseChargePoint):
         except Exception as e:
             log_error(logger, "message_logging_error", f"Failed to log outgoing message: {e}", cp_id=self.id)
 
-        return await super().call(payload, suppress=suppress, timeout=timeout)
+        return await super().call(payload, suppress=suppress)
 
     async def _ensure_charge_point_exists(self):
         """
