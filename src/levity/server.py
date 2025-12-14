@@ -33,6 +33,7 @@ class OCPPServer:
         port: int = 9000,
         plugin_factory: Callable[[], list[ChargePointPlugin]] | None = None,
         metrics_port: int | None = None,
+        ping_interval: float | None = 20,
     ):
         self.db = db
         self.host = host
@@ -40,6 +41,7 @@ class OCPPServer:
         self.charge_points: dict[str, LevityChargePoint] = {}
         self.plugin_factory = plugin_factory or (list)
         self.metrics_port = metrics_port
+        self.ping_interval = ping_interval
         self.metrics_app = None
         self.metrics_runner = None
 
@@ -224,6 +226,7 @@ class OCPPServer:
             self.port,
             subprotocols=["ocpp1.6"],
             select_subprotocol=self.select_subprotocol,
+            ping_interval=self.ping_interval,
         ):
             logger.info(f"OCPP server listening on ws://{self.host}:{self.port}/ws/{{cp_id}}")
             await asyncio.Future()  # Run forever

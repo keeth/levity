@@ -77,6 +77,11 @@ async def main():
         default=1.0,
         help="Seconds to wait before sending RemoteStartTransaction (default: 1.0)",
     )
+    parser.add_argument(
+        "--disable-websocket-ping",
+        action="store_true",
+        help="Disable WebSocket ping/pong messages (useful for chargers that don't handle pings well)",
+    )
 
     args = parser.parse_args()
 
@@ -110,6 +115,9 @@ async def main():
             f"delay={args.auto_start_delay}s"
         )
 
+    # Configure WebSocket ping interval (None disables pings)
+    ping_interval = None if args.disable_websocket_ping else 20
+
     # Create and start server
     server = OCPPServer(
         db,
@@ -117,7 +125,11 @@ async def main():
         port=args.port,
         metrics_port=args.metrics_port,
         plugin_factory=plugin_factory,
+        ping_interval=ping_interval,
     )
+
+    if args.disable_websocket_ping:
+        logger.info("WebSocket ping/pong disabled")
 
     try:
         await server.start()
