@@ -93,7 +93,7 @@ class MockOCPPClient(OCPPChargePoint):
         return await self.call(request)
 
     async def send_stop_transaction(
-        self, transaction_id: int, meter_stop: int, reason: str = "Local"
+        self, transaction_id: int, meter_stop: int, reason: str = "Local", transaction_data: list | None = None
     ):
         """Send StopTransaction."""
         request = call.StopTransaction(
@@ -101,6 +101,7 @@ class MockOCPPClient(OCPPChargePoint):
             meter_stop=meter_stop,
             timestamp=datetime.now(UTC).isoformat(),
             reason=reason,
+            transaction_data=transaction_data,
         )
         return await self.call(request)
 
@@ -490,3 +491,108 @@ class TestOCPPIntegration:
                 await client_task
             except asyncio.CancelledError:
                 pass
+
+    async def test_stop_transaction_with_transaction_data(self, ocpp_server, temp_db):
+        """Test StopTransaction with meter values in transaction_data."""
+        cp_id = "TEST_CP_STOP_TX_DATA"
+
+        async with websockets.connect(
+            f"ws://127.0.0.1:19000/ws/{cp_id}",
+            subprotocols=["ocpp1.6"],
+        ) as ws:
+            client = MockOCPPClient(cp_id, ws)
+            client_task = asyncio.create_task(client.start())
+
+            # Boot notification
+            await client.send_boot_notification("TestVendor", "TestModel")
+
+            # Start transaction
+            start_resp = await client.send_start_transaction(1, "RFID-001", 0)
+            tx_id = start_resp.transaction_id
+            assert tx_id is not None
+
+            # Stop transaction WITH transaction_data (meter values)
+            transaction_data = [
+                {
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "sampled_value": [
+                        {
+                            "value": "5000",
+                            "measurand": "Energy.Active.Import.Register",
+                            "unit": "Wh",
+                            "context": "Sample.Periodic",
+                            "location": "Outlet",
+                        }
+                    ],
+                }
+            ]
+
+            stop_resp = await client.send_stop_transaction(
+                tx_id, meter_stop=5000, reason="Local", transaction_data=transaction_data
+            )
+            assert stop_resp.id_tag_info["status"] == "Accepted"
+
+            # Verify meter values were stored from transaction_data
+            conn = await temp_db.connect()
+            from levity.repositories import MeterValueRepository
+
+            mv_repo = MeterValueRepository(conn)
+            meter_values = await mv_repo.get_for_transaction(tx_id)
+            assert len(meter_values) >= 1, "Should have meter value from transaction_data"
+            assert meter_values[0].value == 5000.0
+            assert meter_values[0].measurand == "Energy.Active.Import.Register"
+
+            client_task.cancel()
+            try:
+                await client_task
+            except asyncio.CancelledError:
+                pass
+
+    async def test_custom_heartbeat_interval(self, temp_db):
+        """Test that server respects custom heartbeat interval."""
+        cp_id = "TEST_CP_CUSTOM_HEARTBEAT"
+
+        # Create server with custom heartbeat interval
+        server = OCPPServer(temp_db, host="127.0.0.1", port=19002, heartbeat_interval=30)
+
+        async def run_server():
+            try:
+                await server.start()
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                print(f"Server error: {e}")
+                raise
+
+        server_task = asyncio.create_task(run_server())
+        await asyncio.sleep(1.0)
+
+        if server_task.done() and server_task.exception():
+            raise server_task.exception()
+
+        try:
+            async with websockets.connect(
+                f"ws://127.0.0.1:19002/ws/{cp_id}",
+                subprotocols=["ocpp1.6"],
+            ) as ws:
+                client = MockOCPPClient(cp_id, ws)
+                client_task = asyncio.create_task(client.start())
+
+                # Send BootNotification and verify custom interval
+                response = await client.send_boot_notification("TestVendor", "TestModel")
+                assert response.status == "Accepted"
+                assert response.interval == 30, "Should use custom heartbeat interval, not default 60"
+
+                client_task.cancel()
+                try:
+                    await client_task
+                except asyncio.CancelledError:
+                    pass
+        finally:
+            # Cleanup
+            server_task.cancel()
+            try:
+                await server_task
+            except asyncio.CancelledError:
+                pass
+            await server.stop()
