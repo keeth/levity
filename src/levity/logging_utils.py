@@ -54,19 +54,29 @@ def log_ocpp_message(
         payload: Message payload
         **kwargs: Additional fields to include
     """
+    event_data = {
+        "direction": direction,
+        "cp_id": cp_id,
+        "message_type": message_type,
+    }
+    
+    # Only include optional fields if they're not None
+    if message_id is not None:
+        event_data["message_id"] = message_id
+    if action is not None:
+        event_data["action"] = action
+    if payload is not None:
+        event_data["payload"] = payload
+    
+    # Filter out None values from kwargs
+    for key, value in kwargs.items():
+        if value is not None:
+            event_data[key] = value
+    
     extra = {
         "event_type": "ocpp_message",
-        "event_data": {
-            "direction": direction,
-            "cp_id": cp_id,
-            "message_type": message_type,
-            "message_id": message_id,
-            "action": action,
-            **kwargs,
-        },
+        "event_data": event_data,
     }
-    if payload:
-        extra["event_data"]["payload"] = payload
 
     logger.info(f"OCPP {direction}: {action or message_type}", extra=extra)
 
@@ -86,13 +96,22 @@ def log_websocket_event(
         cp_id: Charge point ID (if applicable)
         **kwargs: Additional fields to include
     """
+    event_data = {
+        "event": event,
+    }
+    
+    # Only include cp_id if it's not None
+    if cp_id is not None:
+        event_data["cp_id"] = cp_id
+    
+    # Filter out None values from kwargs
+    for key, value in kwargs.items():
+        if value is not None:
+            event_data[key] = value
+    
     extra = {
         "event_type": "websocket_event",
-        "event_data": {
-            "event": event,
-            "cp_id": cp_id,
-            **kwargs,
-        },
+        "event_data": event_data,
     }
     logger.info(f"WebSocket {event}", extra=extra)
 
@@ -116,13 +135,22 @@ def log_error(
         exc_info: Exception object (will extract traceback)
         **kwargs: Additional fields to include
     """
+    event_data = {
+        "error_type": error_type,
+    }
+    
+    # Only include cp_id if it's not None
+    if cp_id is not None:
+        event_data["cp_id"] = cp_id
+    
+    # Filter out None values from kwargs
+    for key, value in kwargs.items():
+        if value is not None:
+            event_data[key] = value
+    
     extra = {
         "event_type": "error",
-        "event_data": {
-            "error_type": error_type,
-            "cp_id": cp_id,
-            **kwargs,
-        },
+        "event_data": event_data,
     }
     logger.error(message, extra=extra, exc_info=exc_info)
 
