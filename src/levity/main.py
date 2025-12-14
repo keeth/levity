@@ -14,20 +14,30 @@ import asyncio
 import logging
 
 from levity.database import Database
+from levity.logging_utils import JSONFormatter
 from levity.plugins import AutoRemoteStartPlugin, OrphanedTransactionPlugin
 from levity.server import OCPPServer
 
 
 def setup_logging(level: str = "INFO"):
-    """Configure logging for the application."""
-    logging.basicConfig(
-        level=getattr(logging, level.upper()),
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[
-            logging.StreamHandler(sys.stdout),
-            logging.FileHandler("levity.log"),
-        ],
-    )
+    """Configure JSON logging for the application."""
+    json_formatter = JSONFormatter()
+
+    # Create handlers
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(json_formatter)
+
+    file_handler = logging.FileHandler("levity.log")
+    file_handler.setFormatter(json_formatter)
+
+    # Configure root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(getattr(logging, level.upper()))
+    root_logger.handlers = [console_handler, file_handler]
+
+    # Suppress verbose logging from dependencies
+    logging.getLogger("websockets").setLevel(logging.WARNING)
+    logging.getLogger("aiohttp").setLevel(logging.WARNING)
 
 
 async def main():
@@ -89,11 +99,18 @@ async def main():
     setup_logging(args.log_level)
     logger = logging.getLogger(__name__)
 
-    logger.info("Starting Levity OCPP Central System")
-    logger.info(f"Database: {args.db}")
-    logger.info(f"WebSocket endpoint: ws://{args.host}:{args.port}/ws/{{cp_id}}")
-    if args.metrics_port:
-        logger.info(f"Metrics endpoint: http://{args.host}:{args.metrics_port}/metrics")
+    # Log startup as structured event
+    logger.info(
+        "System starting",
+        extra={
+            "event_type": "system_startup",
+            "event_data": {
+                "database": args.db,
+                "websocket_endpoint": f"ws://{args.host}:{args.port}/ws/{{cp_id}}",
+                "metrics_endpoint": f"http://{args.host}:{args.metrics_port}/metrics" if args.metrics_port else None,
+            },
+        },
+    )
 
     # Initialize database
     db = Database(args.db)
@@ -110,10 +127,6 @@ async def main():
                 OrphanedTransactionPlugin(),
             ]
         plugin_factory = create_plugins
-        logger.info(
-            f"AutoRemoteStartPlugin enabled: id_tag={args.auto_start_id_tag}, "
-            f"delay={args.auto_start_delay}s"
-        )
 
     # Configure WebSocket ping interval (None disables pings)
     ping_interval = None if args.disable_websocket_ping else 20
@@ -128,15 +141,17 @@ async def main():
         ping_interval=ping_interval,
     )
 
-    if args.disable_websocket_ping:
-        logger.info("WebSocket ping/pong disabled")
-
     try:
         await server.start()
     except KeyboardInterrupt:
-        logger.info("Received shutdown signal")
+        logger.info(
+            "System shutting down",
+            extra={"event_type": "system_shutdown", "event_data": {"reason": "SIGINT"}},
+        )
     except Exception as e:
-        logger.error(f"Server error: {e}", exc_info=True)
+        from levity.logging_utils import log_error
+
+        log_error(logger, "server_error", f"Server error: {e}", exc_info=e)
         raise
     finally:
         await server.stop()

@@ -86,10 +86,6 @@ class FluentdAuditPlugin(ChargePointPlugin):
                 buffer_overflow_handler=self.buffer_overflow_handler,
                 nanosecond_precision=self.nanosecond_precision,
             )
-            self.logger.info(
-                f"Fluentd audit logging initialized for {charge_point.id} "
-                f"(endpoint: {self.host}:{self.port})"
-            )
         except Exception as e:
             self.logger.error(f"Failed to initialize Fluentd sender: {e}", exc_info=True)
             self.sender = None
@@ -99,7 +95,6 @@ class FluentdAuditPlugin(ChargePointPlugin):
         if self.sender:
             try:
                 await asyncio.to_thread(self.sender.close)
-                self.logger.info(f"Fluentd audit logging closed for {charge_point.id}")
             except Exception as e:
                 self.logger.error(f"Error closing Fluentd sender: {e}", exc_info=True)
 
@@ -335,7 +330,6 @@ class FluentdWebSocketAuditPlugin(ChargePointPlugin):
                 pass  # Remote address not available
 
             await asyncio.to_thread(self.sender.emit, "websocket", data)
-            self.logger.info(f"Logged WebSocket connection for {charge_point.id}")
 
         except Exception as e:
             self.logger.error(f"Failed to initialize WebSocket audit logger: {e}", exc_info=True)
@@ -354,6 +348,5 @@ class FluentdWebSocketAuditPlugin(ChargePointPlugin):
                 await asyncio.to_thread(self.sender.emit, "websocket", data)
 
                 await asyncio.to_thread(self.sender.close)
-                self.logger.info(f"Logged WebSocket disconnection for {charge_point.id}")
             except Exception as e:
                 self.logger.error(f"Error in WebSocket audit cleanup: {e}", exc_info=True)

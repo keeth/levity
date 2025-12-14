@@ -163,14 +163,12 @@ class PrometheusMetricsPlugin(ChargePointPlugin):
         cp_id = charge_point.id
         self.ocpp_cp_connected.labels(cp_id=cp_id).set(1)
         self.ocpp_cp_last_msg_ts.labels(cp_id=cp_id).set(time.time())
-        self.logger.info(f"Prometheus metrics initialized for {cp_id}")
 
     async def cleanup(self, charge_point):
         """Mark charge point as disconnected and increment disconnect counter."""
         cp_id = charge_point.id
         self.ocpp_cp_connected.labels(cp_id=cp_id).set(0)
         self.ocpp_cp_disconnects_total.labels(cp_id=cp_id).inc()
-        self.logger.info(f"Prometheus metrics cleaned up for {cp_id}")
 
     # Helper methods
 

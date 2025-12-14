@@ -1,5 +1,6 @@
 """OCPP Charge Point handler with database integration."""
 
+import json
 import logging
 from datetime import UTC, datetime
 
@@ -13,6 +14,7 @@ from ocpp.v16.enums import (
     RegistrationStatus,
 )
 
+from ..logging_utils import log_error, log_ocpp_message
 from ..models import ChargePoint, Connector, MeterValue, Transaction
 from ..plugins.base import ChargePointPlugin, PluginContext, PluginHook
 from ..repositories import (
@@ -56,6 +58,73 @@ class LevityChargePoint(BaseChargePoint):
         self._plugin_hooks: dict[PluginHook, list[tuple[ChargePointPlugin, str]]] = {}
         self._register_plugins()
 
+    async def route_message(self, raw_message: str):
+        """Override to log incoming OCPP messages."""
+        try:
+            message = json.loads(raw_message)
+            message_type = message[0]
+            message_id = message[1] if len(message) > 1 else None
+
+            if message_type == 2:  # CALL
+                action = message[2] if len(message) > 2 else None
+                payload = message[3] if len(message) > 3 else None
+                log_ocpp_message(
+                    logger,
+                    direction="received",
+                    cp_id=self.id,
+                    message_type="CALL",
+                    message_id=message_id,
+                    action=action,
+                    payload=payload,
+                )
+            elif message_type == 3:  # CALLRESULT
+                payload = message[2] if len(message) > 2 else None
+                log_ocpp_message(
+                    logger,
+                    direction="received",
+                    cp_id=self.id,
+                    message_type="CALLRESULT",
+                    message_id=message_id,
+                    payload=payload,
+                )
+            elif message_type == 4:  # CALLERROR
+                error_code = message[2] if len(message) > 2 else None
+                error_description = message[3] if len(message) > 3 else None
+                error_details = message[4] if len(message) > 4 else None
+                log_ocpp_message(
+                    logger,
+                    direction="received",
+                    cp_id=self.id,
+                    message_type="CALLERROR",
+                    message_id=message_id,
+                    error_code=error_code,
+                    error_description=error_description,
+                    error_details=error_details,
+                )
+        except Exception as e:
+            log_error(logger, "message_logging_error", f"Failed to log incoming message: {e}", cp_id=self.id)
+
+        return await super().route_message(raw_message)
+
+    async def call(self, payload, suppress=False, timeout=None):
+        """Override to log outgoing OCPP CALL messages."""
+        try:
+            # Extract action from payload
+            action = payload.__class__.__name__
+            payload_dict = payload.to_dict() if hasattr(payload, "to_dict") else {}
+            log_ocpp_message(
+                logger,
+                direction="sent",
+                cp_id=self.id,
+                message_type="CALL",
+                action=action,
+                payload=payload_dict,
+            )
+        except Exception as e:
+            log_error(logger, "message_logging_error", f"Failed to log outgoing message: {e}", cp_id=self.id)
+
+        return await super().call(payload, suppress=suppress, timeout=timeout)
+
     async def _ensure_charge_point_exists(self):
         """
         Ensure charge point exists in database.
@@ -73,7 +142,6 @@ class LevityChargePoint(BaseChargePoint):
                 status="Unknown",
             )
             await self.cp_repo.upsert(minimal_cp)
-            logger.debug(f"Created minimal charge point record for {self.id}")
 
     @on(Action.boot_notification)
     async def on_boot_notification(
@@ -84,8 +152,6 @@ class LevityChargePoint(BaseChargePoint):
 
         Creates or updates the charge point record in the database.
         """
-        logger.info(f"BootNotification from {self.id}: {charge_point_vendor} {charge_point_model}")
-
         # Execute BEFORE hooks
         message_data = {
             "charge_point_vendor": charge_point_vendor,
@@ -133,8 +199,6 @@ class LevityChargePoint(BaseChargePoint):
 
         Updates the last heartbeat timestamp for the charge point.
         """
-        logger.debug(f"Heartbeat from {self.id}")
-
         # Ensure charge point exists before processing
         await self._ensure_charge_point_exists()
 
@@ -161,8 +225,6 @@ class LevityChargePoint(BaseChargePoint):
         Updates connector status in the database. If connector_id is 0,
         updates the charge point status instead.
         """
-        logger.info(f"StatusNotification from {self.id}, connector {connector_id}: {status}")
-
         # Ensure charge point exists before processing
         await self._ensure_charge_point_exists()
 
@@ -194,10 +256,6 @@ class LevityChargePoint(BaseChargePoint):
         result = call_result.StatusNotification()
 
         # Execute AFTER hooks
-        logger.debug(
-            f"Executing AFTER_STATUS_NOTIFICATION hooks for CP {self.id}, "
-            f"connector_id={connector_id}, status={status}"
-        )
         await self._execute_plugin_hooks(PluginHook.AFTER_STATUS_NOTIFICATION, message_data, result)
 
         return result
@@ -211,8 +269,6 @@ class LevityChargePoint(BaseChargePoint):
 
         Creates a new transaction record in the database.
         """
-        logger.info(f"StartTransaction from {self.id}, connector {connector_id}, tag {id_tag}")
-
         # Ensure charge point exists before processing
         await self._ensure_charge_point_exists()
 
@@ -287,7 +343,6 @@ class LevityChargePoint(BaseChargePoint):
         """
         # Ensure charge point exists before processing
         await self._ensure_charge_point_exists()
-        logger.info(f"StopTransaction from {self.id}, tx_id {transaction_id}")
 
         # Execute BEFORE hooks
         message_data = {
@@ -336,10 +391,6 @@ class LevityChargePoint(BaseChargePoint):
         await self._ensure_charge_point_exists()
 
         transaction_id = kwargs.get("transaction_id")
-        logger.debug(
-            f"MeterValues from {self.id}, connector {connector_id}, "
-            f"tx {transaction_id}, {len(meter_value)} samples"
-        )
 
         # Execute BEFORE hooks
         message_data = {
@@ -409,8 +460,6 @@ class LevityChargePoint(BaseChargePoint):
         # Ensure charge point exists before processing
         await self._ensure_charge_point_exists()
 
-        logger.info(f"Authorize request from {self.id} for tag {id_tag}")
-
         # Execute BEFORE hooks
         message_data = {"id_tag": id_tag}
         await self._execute_plugin_hooks(PluginHook.BEFORE_AUTHORIZE, message_data)
@@ -428,11 +477,9 @@ class LevityChargePoint(BaseChargePoint):
         self, charge_point_vendor: str, charge_point_model: str, **kwargs
     ):
         """Post-processing after BootNotification."""
-        logger.debug(f"Charge point {self.id} registered successfully")
 
     async def on_disconnect(self):
         """Handle charge point disconnection."""
-        logger.info(f"Charge point {self.id} disconnected")
         await self.cp_repo.update_connection_status(self.id, False)
 
         # Cleanup plugins
@@ -440,33 +487,32 @@ class LevityChargePoint(BaseChargePoint):
             try:
                 await plugin.cleanup(self)
             except Exception as e:
-                logger.error(f"Error cleaning up plugin {plugin.__class__.__name__}: {e}")
+                log_error(
+                    logger,
+                    "plugin_cleanup_error",
+                    f"Error cleaning up plugin {plugin.__class__.__name__}: {e}",
+                    cp_id=self.id,
+                    plugin=plugin.__class__.__name__,
+                    exc_info=e,
+                )
 
     def _register_plugins(self):
         """Register all plugins and build hook mapping."""
-        logger.info(f"Registering {len(self.plugins)} plugin(s) for CP {self.id}")
         for plugin in self.plugins:
             try:
                 hooks = plugin.hooks()
-                logger.debug(
-                    f"Plugin {plugin.__class__.__name__} returned {len(hooks)} hook(s): {list(hooks.keys())}"
-                )
                 for hook, method_name in hooks.items():
                     if hook not in self._plugin_hooks:
                         self._plugin_hooks[hook] = []
                     self._plugin_hooks[hook].append((plugin, method_name))
-                    logger.debug(
-                        f"Registered hook {hook.value} -> {plugin.__class__.__name__}.{method_name} for CP {self.id}"
-                    )
-
-                logger.info(
-                    f"Registered plugin {plugin.__class__.__name__} "
-                    f"with {len(hooks)} hook(s) for CP {self.id}"
-                )
             except Exception as e:
-                logger.error(
+                log_error(
+                    logger,
+                    "plugin_registration_error",
                     f"Failed to register plugin {plugin.__class__.__name__}: {e}",
-                    exc_info=True,
+                    cp_id=self.id,
+                    plugin=plugin.__class__.__name__,
+                    exc_info=e,
                 )
 
     async def _execute_plugin_hooks(
@@ -484,12 +530,7 @@ class LevityChargePoint(BaseChargePoint):
             result: The result from the handler (for AFTER hooks)
         """
         if hook not in self._plugin_hooks:
-            logger.debug(f"No plugins registered for hook {hook.value} on CP {self.id}")
             return
-
-        logger.debug(
-            f"Executing {len(self._plugin_hooks[hook])} plugin hook(s) for {hook.value} on CP {self.id}"
-        )
 
         context = PluginContext(
             charge_point=self,
@@ -499,17 +540,16 @@ class LevityChargePoint(BaseChargePoint):
 
         for plugin, method_name in self._plugin_hooks[hook]:
             try:
-                logger.debug(
-                    f"Calling {plugin.__class__.__name__}.{method_name} for hook {hook.value} on CP {self.id}"
-                )
                 method = getattr(plugin, method_name)
                 await method(context)
-                logger.debug(
-                    f"Successfully executed {plugin.__class__.__name__}.{method_name} for hook {hook.value} on CP {self.id}"
-                )
             except Exception as e:
-                logger.error(
-                    f"Error executing {plugin.__class__.__name__}.{method_name} "
-                    f"for hook {hook.value}: {e}",
-                    exc_info=True,
+                log_error(
+                    logger,
+                    "plugin_execution_error",
+                    f"Error executing {plugin.__class__.__name__}.{method_name} for hook {hook.value}: {e}",
+                    cp_id=self.id,
+                    plugin=plugin.__class__.__name__,
+                    hook=hook.value,
+                    method=method_name,
+                    exc_info=e,
                 )

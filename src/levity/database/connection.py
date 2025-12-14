@@ -25,8 +25,6 @@ class Database:
             await self.connection.execute("PRAGMA synchronous=NORMAL")
             await self.connection.execute("PRAGMA temp_store=MEMORY")
             await self.connection.execute("PRAGMA foreign_keys=ON")
-
-            logger.info(f"Connected to database: {self.db_path}")
         return self.connection
 
     async def disconnect(self):
@@ -34,7 +32,6 @@ class Database:
         if self.connection:
             await self.connection.close()
             self.connection = None
-            logger.info("Disconnected from database")
 
     async def initialize_schema(self, schema_path: str = "sql/001_initial.up.sql"):
         """Initialize database schema from SQL file."""
@@ -59,7 +56,6 @@ class Database:
         # Execute schema initialization
         await conn.executescript(schema_sql)
         await conn.commit()
-        logger.info("Database schema initialized")
 
     async def __aenter__(self):
         """Async context manager entry."""

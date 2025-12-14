@@ -11,6 +11,7 @@ from websockets.asyncio.server import ServerConnection
 
 from .database import Database
 from .handlers import LevityChargePoint
+from .logging_utils import log_error, log_websocket_event
 from .plugins.base import ChargePointPlugin
 
 logger = logging.getLogger(__name__)
@@ -60,9 +61,11 @@ class OCPPServer:
             path_parts = connection.request.path.strip("/").split("/")
 
             if len(path_parts) != 2 or path_parts[0] != "ws":
-                logger.warning(
-                    f"Invalid connection path: {connection.request.path}. "
-                    "Expected format: /ws/{{charge_point_id}}"
+                log_error(
+                    logger,
+                    "websocket_error",
+                    f"Invalid connection path: {connection.request.path}",
+                    error_code="INVALID_PATH",
                 )
                 await connection.close(1002, "Invalid path format")
                 return
@@ -70,21 +73,22 @@ class OCPPServer:
             charge_point_id = path_parts[1]
 
             if not charge_point_id:
-                logger.warning("Empty charge point ID in connection path")
+                log_error(
+                    logger,
+                    "websocket_error",
+                    "Empty charge point ID in connection path",
+                    error_code="MISSING_CP_ID",
+                )
                 await connection.close(1002, "Missing charge point ID")
                 return
 
-            logger.info(f"Charge point {charge_point_id} connecting...")
+            log_websocket_event(logger, "connect", cp_id=charge_point_id)
 
             # Get database connection
             db_conn = await self.db.connect()
 
             # Create plugins for this charge point
             plugins = self.plugin_factory()
-            logger.info(
-                f"Created {len(plugins)} plugin(s) for CP {charge_point_id}: "
-                f"{[p.__class__.__name__ for p in plugins]}"
-            )
 
             # Create ChargePoint instance with plugins
             charge_point = LevityChargePoint(charge_point_id, connection, db_conn, plugins)
@@ -95,10 +99,13 @@ class OCPPServer:
                 try:
                     await plugin.initialize(charge_point)
                 except Exception as e:
-                    logger.error(
-                        f"Failed to initialize plugin {plugin.__class__.__name__} "
-                        f"for CP {charge_point_id}: {e}",
-                        exc_info=True,
+                    log_error(
+                        logger,
+                        "plugin_initialization_error",
+                        f"Failed to initialize plugin {plugin.__class__.__name__} for CP {charge_point_id}: {e}",
+                        cp_id=charge_point_id,
+                        plugin=plugin.__class__.__name__,
+                        exc_info=e,
                     )
 
             # Get current timestamp from database
@@ -113,17 +120,18 @@ class OCPPServer:
                 current_time,
             )
 
-            logger.info(f"Charge point {charge_point_id} connected")
-
             # Start listening for messages
             await charge_point.start()
 
         except websockets.exceptions.ConnectionClosed:
-            logger.info(f"Charge point {charge_point_id} connection closed")
+            log_websocket_event(logger, "disconnect", cp_id=charge_point_id, reason="connection_closed")
         except Exception as e:
-            logger.error(
+            log_error(
+                logger,
+                "websocket_error",
                 f"Error handling charge point {charge_point_id}: {e}",
-                exc_info=True,
+                cp_id=charge_point_id,
+                exc_info=e,
             )
             # Try to close the connection gracefully
             try:
@@ -137,11 +145,17 @@ class OCPPServer:
                 try:
                     await charge_point.on_disconnect()
                 except Exception as e:
-                    logger.error(f"Error during disconnect cleanup for {charge_point_id}: {e}")
+                    log_error(
+                        logger,
+                        "disconnect_cleanup_error",
+                        f"Error during disconnect cleanup for {charge_point_id}: {e}",
+                        cp_id=charge_point_id,
+                        exc_info=e,
+                    )
             if charge_point_id and charge_point_id in self.charge_points:
                 del self.charge_points[charge_point_id]
             if charge_point_id:
-                logger.info(f"Charge point {charge_point_id} disconnected")
+                log_websocket_event(logger, "disconnect", cp_id=charge_point_id)
 
     async def metrics_handler(self, request):
         """Handle /metrics endpoint for Prometheus."""
@@ -162,13 +176,10 @@ class OCPPServer:
         site = web.TCPSite(self.metrics_runner, self.host, self.metrics_port)
         await site.start()
 
-        logger.info(f"Prometheus metrics server listening on http://{self.host}:{self.metrics_port}/metrics")
-
     async def stop_metrics_server(self):
         """Stop the metrics HTTP server."""
         if self.metrics_runner:
             await self.metrics_runner.cleanup()
-            logger.info("Prometheus metrics server stopped")
 
 
 
@@ -186,22 +197,22 @@ class OCPPServer:
         try:
             # Handle case where client doesn't send any subprotocols
             if not subprotocols:
-                logger.debug("Client sent no subprotocols, defaulting to ocpp1.6")
                 return "ocpp1.6"
 
             # If client sent subprotocols, check if ocpp1.6 is supported
             if "ocpp1.6" in subprotocols:
-                logger.debug("Client supports ocpp1.6, selecting it")
                 return "ocpp1.6"
 
             # Client sent subprotocols but not ocpp1.6 - default anyway
-            logger.warning(
-                f"Client sent subprotocols {subprotocols} but ocpp1.6 not found. "
-                "Defaulting to ocpp1.6 anyway."
+            log_error(
+                logger,
+                "websocket_error",
+                f"Client sent subprotocols {subprotocols} but ocpp1.6 not found. Defaulting to ocpp1.6 anyway.",
+                error_code="UNSUPPORTED_SUBPROTOCOL",
             )
             return "ocpp1.6"
         except Exception as e:
-            logger.error(f"Error in select_subprotocol: {e}", exc_info=True)
+            log_error(logger, "websocket_error", f"Error in select_subprotocol: {e}", exc_info=e)
             # Default to ocpp1.6 on error
             return "ocpp1.6"
 
@@ -211,8 +222,6 @@ class OCPPServer:
 
         Initializes the database schema and starts listening for connections.
         """
-        logger.info(f"Starting OCPP server on {self.host}:{self.port}")
-
         # Initialize database
         await self.db.initialize_schema()
 
@@ -228,13 +237,16 @@ class OCPPServer:
             select_subprotocol=self.select_subprotocol,
             ping_interval=self.ping_interval,
         ):
-            logger.info(f"OCPP server listening on ws://{self.host}:{self.port}/ws/{{cp_id}}")
+            log_websocket_event(
+                logger,
+                "server_started",
+                host=self.host,
+                port=self.port,
+            )
             await asyncio.Future()  # Run forever
 
     async def stop(self):
         """Stop the server and cleanup resources."""
-        logger.info("Stopping OCPP server")
-
         # Stop metrics server
         await self.stop_metrics_server()
 
@@ -243,11 +255,17 @@ class OCPPServer:
             try:
                 await cp.on_disconnect()
             except Exception as e:
-                logger.error(f"Error disconnecting charge point {cp_id}: {e}")
+                log_error(
+                    logger,
+                    "disconnect_error",
+                    f"Error disconnecting charge point {cp_id}: {e}",
+                    cp_id=cp_id,
+                    exc_info=e,
+                )
 
         self.charge_points.clear()
 
         # Close database connection
         await self.db.disconnect()
 
-        logger.info("OCPP server stopped")
+        log_websocket_event(logger, "server_stopped")

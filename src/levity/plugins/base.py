@@ -84,7 +84,8 @@ class ChargePointPlugin(ABC):
                 }
 
             async def on_boot_complete(self, context: PluginContext):
-                logger.info(f"Charge point {context.charge_point.id} booted!")
+                # Plugin logic here
+                pass
     """
 
     def __init__(self):

@@ -43,11 +43,6 @@ class OrphanedTransactionPlugin(ChargePointPlugin):
         if not active_txs:
             return
 
-        self.logger.info(
-            f"Found {len(active_txs)} orphaned transaction(s) for {cp_id}. "
-            "Closing them before starting new transaction."
-        )
-
         # Close each orphaned transaction
         for tx in active_txs:
             try:
@@ -56,10 +51,6 @@ class OrphanedTransactionPlugin(ChargePointPlugin):
 
                 if last_meter:
                     meter_stop = int(last_meter.value)
-                    self.logger.info(
-                        f"Using last meter value {meter_stop} from transaction {tx.id} "
-                        f"(started at {tx.start_time})"
-                    )
                 else:
                     # No meter values recorded - use the meter_start value
                     meter_stop = tx.meter_start
@@ -75,12 +66,6 @@ class OrphanedTransactionPlugin(ChargePointPlugin):
                     stop_time=stop_time,
                     meter_stop=meter_stop,
                     stop_reason="Other",
-                )
-
-                self.logger.info(
-                    f"Closed orphaned transaction {tx.id} for {cp_id}. "
-                    f"Duration: {tx.start_time} to {stop_time}, "
-                    f"Energy: {meter_stop - tx.meter_start} Wh"
                 )
 
             except Exception as e:
