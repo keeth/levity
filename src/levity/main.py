@@ -17,6 +17,8 @@ from levity.database import Database
 from levity.logging_utils import JSONFormatter, log_error
 from levity.plugins import (
     AutoRemoteStartPlugin,
+    FluentdAuditPlugin,
+    FluentdWebSocketAuditPlugin,
     OrphanedTransactionPlugin,
     PrometheusMetricsPlugin,
 )
@@ -103,8 +105,32 @@ async def main():
         default=60,
         help="OCPP heartbeat interval in seconds (default: 60)",
     )
+    parser.add_argument(
+        "--fluentd-endpoint",
+        default=None,
+        help="Fluentd endpoint in host:port format (e.g., localhost:24224). If provided, enables Fluentd audit logging.",
+    )
+    parser.add_argument(
+        "--fluentd-tag",
+        default="ocpp",
+        help="Tag prefix for Fluentd events (default: ocpp)",
+    )
 
     args = parser.parse_args()
+
+    # Parse Fluentd endpoint if provided
+    fluentd_host = None
+    fluentd_port = None
+    if args.fluentd_endpoint:
+        try:
+            if ":" not in args.fluentd_endpoint:
+                parser.error("--fluentd-endpoint must be in host:port format (e.g., localhost:24224)")
+            fluentd_host, port_str = args.fluentd_endpoint.rsplit(":", 1)
+            fluentd_port = int(port_str)
+            if not fluentd_host:
+                parser.error("--fluentd-endpoint host cannot be empty")
+        except ValueError:
+            parser.error(f"Invalid port in --fluentd-endpoint: {args.fluentd_endpoint}")
 
     # Setup logging
     setup_logging(args.log_level)
@@ -121,6 +147,8 @@ async def main():
                 "metrics_endpoint": f"http://{args.host}:{args.metrics_port}/metrics"
                 if args.metrics_port
                 else None,
+                "fluentd_enabled": args.fluentd_endpoint is not None,
+                "fluentd_endpoint": args.fluentd_endpoint,
             },
         },
     )
@@ -147,6 +175,24 @@ async def main():
                     id_tag=args.auto_start_id_tag,
                     delay_seconds=args.auto_start_delay,
                 )
+            )
+
+        # Include Fluentd plugins if enabled
+        if args.fluentd_endpoint:
+            plugins.extend(
+                [
+                    FluentdAuditPlugin(
+                        tag_prefix=args.fluentd_tag,
+                        host=fluentd_host,
+                        port=fluentd_port,
+                        timeout=3.0,
+                    ),
+                    FluentdWebSocketAuditPlugin(
+                        tag_prefix=args.fluentd_tag,
+                        host=fluentd_host,
+                        port=fluentd_port,
+                    ),
+                ]
             )
 
         return plugins
