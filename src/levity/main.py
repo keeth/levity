@@ -14,6 +14,7 @@ import asyncio
 import logging
 
 from levity.database import Database
+from levity.plugins import AutoRemoteStartPlugin, OrphanedTransactionPlugin
 from levity.server import OCPPServer
 
 
@@ -60,6 +61,22 @@ async def main():
         default=None,
         help="Port for Prometheus metrics HTTP server (default: disabled)",
     )
+    parser.add_argument(
+        "--enable-auto-start",
+        action="store_true",
+        help="Enable AutoRemoteStartPlugin to automatically start charging when cable is plugged in",
+    )
+    parser.add_argument(
+        "--auto-start-id-tag",
+        default="anonymous",
+        help="ID tag to use for auto-start transactions (default: anonymous)",
+    )
+    parser.add_argument(
+        "--auto-start-delay",
+        type=float,
+        default=1.0,
+        help="Seconds to wait before sending RemoteStartTransaction (default: 1.0)",
+    )
 
     args = parser.parse_args()
 
@@ -76,9 +93,30 @@ async def main():
     # Initialize database
     db = Database(args.db)
 
+    # Create plugin factory if auto-start is enabled
+    plugin_factory = None
+    if args.enable_auto_start:
+        def create_plugins():
+            return [
+                AutoRemoteStartPlugin(
+                    id_tag=args.auto_start_id_tag,
+                    delay_seconds=args.auto_start_delay,
+                ),
+                OrphanedTransactionPlugin(),
+            ]
+        plugin_factory = create_plugins
+        logger.info(
+            f"AutoRemoteStartPlugin enabled: id_tag={args.auto_start_id_tag}, "
+            f"delay={args.auto_start_delay}s"
+        )
+
     # Create and start server
     server = OCPPServer(
-        db, host=args.host, port=args.port, metrics_port=args.metrics_port
+        db,
+        host=args.host,
+        port=args.port,
+        metrics_port=args.metrics_port,
+        plugin_factory=plugin_factory,
     )
 
     try:
