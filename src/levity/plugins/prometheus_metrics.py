@@ -87,6 +87,12 @@ class PrometheusMetricsPlugin(ChargePointPlugin):
         labelnames=["cp_id"],
     )
 
+    ocpp_cp_reconnect_during_tx_total = Counter(
+        "ocpp_cp_reconnect_during_tx_total",
+        "Total number of reconnects/reboots that occurred during active transactions",
+        labelnames=["cp_id"],
+    )
+
     # Transaction lifecycle
     ocpp_tx_active = Gauge(
         "ocpp_tx_active",
@@ -167,6 +173,15 @@ class PrometheusMetricsPlugin(ChargePointPlugin):
     async def cleanup(self, charge_point):
         """Mark charge point as disconnected and increment disconnect counter."""
         cp_id = charge_point.id
+        
+        # Check if there are active transactions when disconnecting
+        # This indicates a reconnect/reboot during an active transaction
+        active_txs = await charge_point.tx_repo.get_all_active_for_cp(cp_id)
+        if active_txs:
+            # Increment counter for each active transaction
+            for _ in active_txs:
+                self.ocpp_cp_reconnect_during_tx_total.labels(cp_id=cp_id).inc()
+        
         self.ocpp_cp_connected.labels(cp_id=cp_id).set(0)
         self.ocpp_cp_disconnects_total.labels(cp_id=cp_id).inc()
 
@@ -238,6 +253,14 @@ class PrometheusMetricsPlugin(ChargePointPlugin):
         cp_id = context.charge_point.id
         await self.after_message(context)
         self.ocpp_cp_boots_total.labels(cp_id=cp_id).inc()
+
+        # Check if there were orphaned transactions when booting
+        # This indicates a reboot during an active transaction
+        active_txs = await context.charge_point.tx_repo.get_all_active_for_cp(cp_id)
+        if active_txs:
+            # Increment counter for each orphaned transaction found at boot
+            for _ in active_txs:
+                self.ocpp_cp_reconnect_during_tx_total.labels(cp_id=cp_id).inc()
 
     async def after_heartbeat(self, context: PluginContext):
         """Track heartbeat timestamp."""
