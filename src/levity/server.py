@@ -13,6 +13,7 @@ from .database import Database
 from .handlers import LevityChargePoint
 from .logging_utils import log_error, log_websocket_event
 from .plugins.base import ChargePointPlugin
+from .plugins.prometheus_metrics import PrometheusMetricsPlugin
 
 logger = logging.getLogger(__name__)
 
@@ -232,6 +233,11 @@ class OCPPServer:
         """
         # Initialize database
         await self.db.initialize_schema()
+
+        # Initialize Prometheus metrics if metrics port is configured
+        # This sets ocpp_central_up = 1 even before any charge points connect
+        if self.metrics_port:
+            PrometheusMetricsPlugin().ocpp_central_up.set(1)
 
         # Start metrics server if configured
         await self.start_metrics_server()

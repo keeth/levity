@@ -15,7 +15,11 @@ import logging
 
 from levity.database import Database
 from levity.logging_utils import JSONFormatter, log_error
-from levity.plugins import AutoRemoteStartPlugin, OrphanedTransactionPlugin
+from levity.plugins import (
+    AutoRemoteStartPlugin,
+    OrphanedTransactionPlugin,
+    PrometheusMetricsPlugin,
+)
 from levity.server import OCPPServer
 
 
@@ -124,20 +128,30 @@ async def main():
     # Initialize database
     db = Database(args.db)
 
-    # Create plugin factory if auto-start is enabled
-    plugin_factory = None
-    if args.enable_auto_start:
+    # Create plugin factory - always include PrometheusMetricsPlugin if metrics_port is set
+    # Also include OrphanedTransactionPlugin for cleanup
+    def create_plugins():
+        plugins = []
 
-        def create_plugins():
-            return [
+        # Always include PrometheusMetricsPlugin if metrics port is configured
+        if args.metrics_port:
+            plugins.append(PrometheusMetricsPlugin())
+
+        # Include OrphanedTransactionPlugin for cleanup
+        plugins.append(OrphanedTransactionPlugin())
+
+        # Include AutoRemoteStartPlugin if enabled
+        if args.enable_auto_start:
+            plugins.append(
                 AutoRemoteStartPlugin(
                     id_tag=args.auto_start_id_tag,
                     delay_seconds=args.auto_start_delay,
-                ),
-                OrphanedTransactionPlugin(),
-            ]
+                )
+            )
 
-        plugin_factory = create_plugins
+        return plugins
+
+    plugin_factory = create_plugins
 
     # Configure WebSocket ping interval (None disables pings)
     ping_interval = None if args.disable_websocket_ping else 20
