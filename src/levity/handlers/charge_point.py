@@ -376,7 +376,8 @@ class LevityChargePoint(BaseChargePoint):
                 # Get connector ID - either from function param or from looking up transaction
                 conn_id = connector_id
                 if conn_id is None and transaction_id:
-                    tx = await self.tx_repo.get_by_ocpp_tx_id(transaction_id)
+                    # transaction_id is the database ID (returned from StartTransaction)
+                    tx = await self.tx_repo.get_by_id(transaction_id)
                     conn_id = tx.cp_conn_id if tx else 0
 
                 mv = MeterValue(
