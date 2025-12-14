@@ -194,6 +194,10 @@ class LevityChargePoint(BaseChargePoint):
         result = call_result.StatusNotification()
 
         # Execute AFTER hooks
+        logger.debug(
+            f"Executing AFTER_STATUS_NOTIFICATION hooks for CP {self.id}, "
+            f"connector_id={connector_id}, status={status}"
+        )
         await self._execute_plugin_hooks(PluginHook.AFTER_STATUS_NOTIFICATION, message_data, result)
 
         return result
@@ -439,13 +443,20 @@ class LevityChargePoint(BaseChargePoint):
 
     def _register_plugins(self):
         """Register all plugins and build hook mapping."""
+        logger.info(f"Registering {len(self.plugins)} plugin(s) for CP {self.id}")
         for plugin in self.plugins:
             try:
                 hooks = plugin.hooks()
+                logger.debug(
+                    f"Plugin {plugin.__class__.__name__} returned {len(hooks)} hook(s): {list(hooks.keys())}"
+                )
                 for hook, method_name in hooks.items():
                     if hook not in self._plugin_hooks:
                         self._plugin_hooks[hook] = []
                     self._plugin_hooks[hook].append((plugin, method_name))
+                    logger.debug(
+                        f"Registered hook {hook.value} -> {plugin.__class__.__name__}.{method_name} for CP {self.id}"
+                    )
 
                 logger.info(
                     f"Registered plugin {plugin.__class__.__name__} "
@@ -472,7 +483,12 @@ class LevityChargePoint(BaseChargePoint):
             result: The result from the handler (for AFTER hooks)
         """
         if hook not in self._plugin_hooks:
+            logger.debug(f"No plugins registered for hook {hook.value} on CP {self.id}")
             return
+
+        logger.debug(
+            f"Executing {len(self._plugin_hooks[hook])} plugin hook(s) for {hook.value} on CP {self.id}"
+        )
 
         context = PluginContext(
             charge_point=self,
@@ -482,8 +498,14 @@ class LevityChargePoint(BaseChargePoint):
 
         for plugin, method_name in self._plugin_hooks[hook]:
             try:
+                logger.debug(
+                    f"Calling {plugin.__class__.__name__}.{method_name} for hook {hook.value} on CP {self.id}"
+                )
                 method = getattr(plugin, method_name)
                 await method(context)
+                logger.debug(
+                    f"Successfully executed {plugin.__class__.__name__}.{method_name} for hook {hook.value} on CP {self.id}"
+                )
             except Exception as e:
                 logger.error(
                     f"Error executing {plugin.__class__.__name__}.{method_name} "

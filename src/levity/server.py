@@ -79,6 +79,10 @@ class OCPPServer:
 
             # Create plugins for this charge point
             plugins = self.plugin_factory()
+            logger.info(
+                f"Created {len(plugins)} plugin(s) for CP {charge_point_id}: "
+                f"{[p.__class__.__name__ for p in plugins]}"
+            )
 
             # Create ChargePoint instance with plugins
             charge_point = LevityChargePoint(charge_point_id, connection, db_conn, plugins)

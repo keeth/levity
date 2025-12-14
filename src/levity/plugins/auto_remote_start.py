@@ -34,9 +34,13 @@ class AutoRemoteStartPlugin(ChargePointPlugin):
 
     def hooks(self) -> dict[PluginHook, str]:
         """Register hook to monitor status notifications."""
-        return {
+        hooks = {
             PluginHook.AFTER_STATUS_NOTIFICATION: "on_status_change",
         }
+        self.logger.debug(
+            f"AutoRemoteStartPlugin.hooks() returning {len(hooks)} hook(s): {list(hooks.keys())}"
+        )
+        return hooks
 
     async def on_status_change(self, context: PluginContext):
         """
@@ -47,14 +51,33 @@ class AutoRemoteStartPlugin(ChargePointPlugin):
         connector_id = context.message_data.get("connector_id")
         status = context.message_data.get("status")
 
+        self.logger.debug(
+            f"AutoRemoteStartPlugin.on_status_change called for CP {context.charge_point.id}, "
+            f"connector_id={connector_id}, status={status} (type: {type(status).__name__})"
+        )
+
         # Only act on connector-level status (not charge point itself)
         if connector_id == 0:
+            self.logger.debug(
+                f"Ignoring charge point-level status (connector_id=0) for CP {context.charge_point.id}"
+            )
             return
 
         # Check if connector is entering Preparing state
         # Normalize status to string for comparison (handles both string and enum inputs)
         status_str = status if isinstance(status, str) else status.value
-        if status_str != ChargePointStatus.preparing.value:
+        preparing_value = ChargePointStatus.preparing.value
+
+        self.logger.debug(
+            f"Comparing status '{status_str}' (normalized from {status}) "
+            f"to '{preparing_value}' for connector {connector_id}"
+        )
+
+        if status_str != preparing_value:
+            self.logger.debug(
+                f"Status '{status_str}' does not match Preparing state for connector {connector_id}, "
+                f"skipping RemoteStartTransaction"
+            )
             return
 
         self.logger.info(
