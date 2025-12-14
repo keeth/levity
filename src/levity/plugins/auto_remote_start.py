@@ -52,7 +52,9 @@ class AutoRemoteStartPlugin(ChargePointPlugin):
             return
 
         # Check if connector is entering Preparing state
-        if status != ChargePointStatus.preparing:
+        # Normalize status to string for comparison (handles both string and enum inputs)
+        status_str = status if isinstance(status, str) else status.value
+        if status_str != ChargePointStatus.preparing.value:
             return
 
         self.logger.info(
