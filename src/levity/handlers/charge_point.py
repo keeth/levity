@@ -43,9 +43,11 @@ class LevityChargePoint(BaseChargePoint):
         connection,
         db_connection: aiosqlite.Connection,
         plugins: list[ChargePointPlugin] | None = None,
+        heartbeat_interval: int = 60,
     ):
         super().__init__(id, connection)
         self.db = db_connection
+        self.heartbeat_interval = heartbeat_interval
 
         # Initialize repositories
         self.cp_repo = ChargePointRepository(db_connection)
@@ -183,7 +185,7 @@ class LevityChargePoint(BaseChargePoint):
 
         result = call_result.BootNotification(
             current_time=datetime.now(UTC).isoformat(),
-            interval=60,  # Heartbeat interval in seconds
+            interval=self.heartbeat_interval,
             status=RegistrationStatus.accepted,
         )
 

@@ -92,6 +92,12 @@ async def main():
         action="store_true",
         help="Disable WebSocket ping/pong messages (useful for chargers that don't handle pings well)",
     )
+    parser.add_argument(
+        "--heartbeat-interval",
+        type=int,
+        default=60,
+        help="OCPP heartbeat interval in seconds (default: 60)",
+    )
 
     args = parser.parse_args()
 
@@ -139,6 +145,7 @@ async def main():
         metrics_port=args.metrics_port,
         plugin_factory=plugin_factory,
         ping_interval=ping_interval,
+        heartbeat_interval=args.heartbeat_interval,
     )
 
     try:

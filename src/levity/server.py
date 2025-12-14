@@ -35,6 +35,7 @@ class OCPPServer:
         plugin_factory: Callable[[], list[ChargePointPlugin]] | None = None,
         metrics_port: int | None = None,
         ping_interval: float | None = 20,
+        heartbeat_interval: int = 60,
     ):
         self.db = db
         self.host = host
@@ -43,6 +44,7 @@ class OCPPServer:
         self.plugin_factory = plugin_factory or (list)
         self.metrics_port = metrics_port
         self.ping_interval = ping_interval
+        self.heartbeat_interval = heartbeat_interval
         self.metrics_app = None
         self.metrics_runner = None
 
@@ -91,7 +93,9 @@ class OCPPServer:
             plugins = self.plugin_factory()
 
             # Create ChargePoint instance with plugins
-            charge_point = LevityChargePoint(charge_point_id, connection, db_conn, plugins)
+            charge_point = LevityChargePoint(
+                charge_point_id, connection, db_conn, plugins, heartbeat_interval=self.heartbeat_interval
+            )
             self.charge_points[charge_point_id] = charge_point
 
             # Initialize plugins
