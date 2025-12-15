@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  fluent-bit:
+    image: fluent/fluent-bit
+    ports:
+      - "24224:24224"      # Forward protocol (TCP)
+      - "24224:24224/udp"  # Forward protocol (UDP)
+    volumes:
+      - /fluent-bit/etc/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+      - data:/tmp/fluent-bit-s3
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_DEFAULT_REGION=us-west-2
+      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}
+    restart: unless-stopped
+
+volumes:
+  data:
+    driver: local

@@ -86,14 +86,15 @@ class TestFluentdAuditPlugin:
             assert call_args[0][0] == "boot"  # Tag
             event_data = call_args[0][1]  # Data
 
-            assert event_data["event_type"] == "boot_notification"
-            assert event_data["charge_point_id"] == "TEST001"
-            assert event_data["vendor"] == "TestVendor"
-            assert event_data["model"] == "TestModel"
-            assert event_data["firmware_version"] == "1.0.0"
-            assert event_data["serial_number"] == "SN-123"
-            assert event_data["status"] == "Accepted"
-            assert "timestamp" in event_data
+            assert event_data["type"] == "ocpp"
+            assert event_data["cp"] == "TEST001"
+            assert event_data["dir"] == "received"
+            assert "msg" in event_data
+            msg = event_data["msg"]
+            assert msg["charge_point_vendor"] == "TestVendor"
+            assert msg["charge_point_model"] == "TestModel"
+            assert msg["firmware_version"] == "1.0.0"
+            assert msg["charge_point_serial_number"] == "SN-123"
 
     @pytest.mark.asyncio
     async def test_status_notification_logging(self, db_connection):
@@ -119,11 +120,14 @@ class TestFluentdAuditPlugin:
             assert call_args[0][0] == "status"
             event_data = call_args[0][1]
 
-            assert event_data["event_type"] == "status_notification"
-            assert event_data["charge_point_id"] == "TEST001"
-            assert event_data["connector_id"] == 1
-            assert event_data["status"] == "Charging"
-            assert event_data["error_code"] == "NoError"
+            assert event_data["type"] == "ocpp"
+            assert event_data["cp"] == "TEST001"
+            assert event_data["dir"] == "received"
+            assert "msg" in event_data
+            msg = event_data["msg"]
+            assert msg["connector_id"] == 1
+            assert msg["status"] == ChargePointStatus.charging
+            assert msg["error_code"] == "NoError"
 
     @pytest.mark.asyncio
     async def test_transaction_start_logging(self, db_connection):
@@ -136,7 +140,7 @@ class TestFluentdAuditPlugin:
             cp = await create_test_charge_point("TEST001", db_connection, plugins=[plugin])
 
             # Start transaction
-            result = await cp.on_start_transaction(
+            await cp.on_start_transaction(
                 connector_id=1,
                 id_tag="USER-123",
                 meter_start=1000,
@@ -150,12 +154,14 @@ class TestFluentdAuditPlugin:
             assert call_args[0][0] == "transaction.start"
             event_data = call_args[0][1]
 
-            assert event_data["event_type"] == "transaction_start"
-            assert event_data["charge_point_id"] == "TEST001"
-            assert event_data["connector_id"] == 1
-            assert event_data["id_tag"] == "USER-123"
-            assert event_data["meter_start"] == 1000
-            assert event_data["transaction_id"] == result.transaction_id
+            assert event_data["type"] == "ocpp"
+            assert event_data["cp"] == "TEST001"
+            assert event_data["dir"] == "received"
+            assert "msg" in event_data
+            msg = event_data["msg"]
+            assert msg["connector_id"] == 1
+            assert msg["id_tag"] == "USER-123"
+            assert msg["meter_start"] == 1000
 
     @pytest.mark.asyncio
     async def test_transaction_stop_logging(self, db_connection):
@@ -199,12 +205,14 @@ class TestFluentdAuditPlugin:
             assert call_args[0][0] == "transaction.stop"
             event_data = call_args[0][1]
 
-            assert event_data["event_type"] == "transaction_stop"
-            assert event_data["charge_point_id"] == "TEST001"
-            assert event_data["transaction_id"] == tx.id
-            assert event_data["meter_stop"] == 5000
-            assert event_data["energy_delivered"] == 4000  # 5000 - 1000
-            assert event_data["reason"] == "Local"
+            assert event_data["type"] == "ocpp"
+            assert event_data["cp"] == "TEST001"
+            assert event_data["dir"] == "received"
+            assert "msg" in event_data
+            msg = event_data["msg"]
+            assert msg["transaction_id"] == tx.id
+            assert msg["meter_stop"] == 5000
+            assert msg["reason"] == "Local"
 
     @pytest.mark.asyncio
     async def test_heartbeat_logging(self, db_connection):
@@ -229,8 +237,10 @@ class TestFluentdAuditPlugin:
             assert call_args[0][0] == "heartbeat"
             event_data = call_args[0][1]
 
-            assert event_data["event_type"] == "heartbeat"
-            assert event_data["charge_point_id"] == "TEST001"
+            assert event_data["type"] == "ocpp"
+            assert event_data["cp"] == "TEST001"
+            assert event_data["dir"] == "received"
+            assert "msg" in event_data
 
     @pytest.mark.asyncio
     async def test_meter_values_logging(self, db_connection):
@@ -279,11 +289,14 @@ class TestFluentdAuditPlugin:
             assert call_args[0][0] == "meter"
             event_data = call_args[0][1]
 
-            assert event_data["event_type"] == "meter_values"
-            assert event_data["connector_id"] == 1
-            assert event_data["transaction_id"] == tx.id
-            assert event_data["samples_count"] == 2
-            assert set(event_data["measurands"]) == {"Energy.Active.Import.Register", "Voltage"}
+            assert event_data["type"] == "ocpp"
+            assert event_data["cp"] == "TEST001"
+            assert event_data["dir"] == "received"
+            assert "msg" in event_data
+            msg = event_data["msg"]
+            assert msg["connector_id"] == 1
+            assert msg["transaction_id"] == tx.id
+            assert len(msg["meter_value"]) == 1
 
     @pytest.mark.asyncio
     async def test_cleanup_closes_sender(self, db_connection):
@@ -339,9 +352,9 @@ class TestFluentdWebSocketAuditPlugin:
             assert call_args[0][0] == "websocket"
             event_data = call_args[0][1]
 
-            assert event_data["event_type"] == "websocket_connect"
-            assert event_data["charge_point_id"] == "TEST001"
-            assert "timestamp" in event_data
+            assert event_data["type"] == "ws"
+            assert event_data["cp"] == "TEST001"
+            assert event_data["event"] == "connect"
 
     @pytest.mark.asyncio
     async def test_logs_disconnection_event(self, db_connection):
@@ -366,8 +379,9 @@ class TestFluentdWebSocketAuditPlugin:
             assert call_args[0][0] == "websocket"
             event_data = call_args[0][1]
 
-            assert event_data["event_type"] == "websocket_disconnect"
-            assert event_data["charge_point_id"] == "TEST001"
+            assert event_data["type"] == "ws"
+            assert event_data["cp"] == "TEST001"
+            assert event_data["event"] == "disconnect"
 
             # Verify sender was closed
             mock_sender.close.assert_called_once()
