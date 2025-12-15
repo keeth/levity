@@ -44,8 +44,9 @@ class LevityChargePoint(BaseChargePoint):
         db_connection: aiosqlite.Connection,
         plugins: list[ChargePointPlugin] | None = None,
         heartbeat_interval: int = 60,
+        response_timeout: int = 30,
     ):
-        super().__init__(id, connection)
+        super().__init__(id, connection, response_timeout=response_timeout)
         self.db = db_connection
         self.heartbeat_interval = heartbeat_interval
 

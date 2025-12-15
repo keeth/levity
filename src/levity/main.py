@@ -106,6 +106,12 @@ async def main():
         help="OCPP heartbeat interval in seconds (default: 60)",
     )
     parser.add_argument(
+        "--response-timeout",
+        type=int,
+        default=30,
+        help="OCPP response timeout in seconds (default: 30)",
+    )
+    parser.add_argument(
         "--fluentd-endpoint",
         default=None,
         help="Fluentd endpoint in host:port format (e.g., localhost:24224). If provided, enables Fluentd audit logging.",
@@ -211,6 +217,7 @@ async def main():
         plugin_factory=plugin_factory,
         ping_interval=ping_interval,
         heartbeat_interval=args.heartbeat_interval,
+        response_timeout=args.response_timeout,
     )
 
     try:

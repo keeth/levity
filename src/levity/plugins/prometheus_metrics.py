@@ -131,6 +131,12 @@ class PrometheusMetricsPlugin(ChargePointPlugin):
         labelnames=["cp_id"],
     )
 
+    ocpp_energy_jump_total = Counter(
+        "ocpp_energy_jump_total",
+        "Total number of large energy reading jumps detected (>10kWh between readings)",
+        labelnames=["cp_id"],
+    )
+
     def __init__(self):
         """Initialize the Prometheus metrics plugin."""
         super().__init__()
@@ -138,6 +144,8 @@ class PrometheusMetricsPlugin(ChargePointPlugin):
         self.ocpp_central_up.set(1)
         # Track message start times for histogram
         self._message_start_times = {}
+        # Track previous energy readings to detect jumps: {(cp_id, connector_id): last_reading}
+        self._previous_energy_readings = {}
 
     def hooks(self) -> dict[PluginHook, str]:
         """Register hooks for all relevant OCPP message types."""
@@ -376,6 +384,22 @@ class PrometheusMetricsPlugin(ChargePointPlugin):
 
                 # Track energy (Wh)
                 if measurand == "Energy.Active.Import.Register":
+                    # Detect large jumps in energy readings (charger bugs)
+                    # Track per charge point (each charger has one connector)
+                    if cp_id in self._previous_energy_readings:
+                        previous_reading = self._previous_energy_readings[cp_id]
+                        jump_size = abs(numeric_value - previous_reading)
+                        # Detect jumps > 10,000 Wh (10 kWh)
+                        if jump_size > 10000:
+                            self.ocpp_energy_jump_total.labels(cp_id=cp_id).inc()
+                            self.logger.warning(
+                                f"Large energy jump detected: {cp_id} "
+                                f"jumped from {previous_reading} to {numeric_value} Wh "
+                                f"(delta: {jump_size} Wh)"
+                            )
+                    # Update previous reading
+                    self._previous_energy_readings[cp_id] = numeric_value
+
                     # This is the current meter reading
                     # To get energy for THIS transaction, need meter_start
                     if transaction_id:

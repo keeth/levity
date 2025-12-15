@@ -37,6 +37,7 @@ class OCPPServer:
         metrics_port: int | None = None,
         ping_interval: float | None = 20,
         heartbeat_interval: int = 60,
+        response_timeout: int = 30,
     ):
         self.db = db
         self.host = host
@@ -46,6 +47,7 @@ class OCPPServer:
         self.metrics_port = metrics_port
         self.ping_interval = ping_interval
         self.heartbeat_interval = heartbeat_interval
+        self.response_timeout = response_timeout
         self.metrics_app = None
         self.metrics_runner = None
 
@@ -100,6 +102,7 @@ class OCPPServer:
                 db_conn,
                 plugins,
                 heartbeat_interval=self.heartbeat_interval,
+                response_timeout=self.response_timeout,
             )
             self.charge_points[charge_point_id] = charge_point
 

@@ -267,6 +267,142 @@ class TestPrometheusMetricsPlugin:
         assert value == 16.5
 
     @pytest.mark.asyncio
+    async def test_energy_jump_detection(self, db_connection):
+        """Test that large energy reading jumps are detected and counted."""
+        plugin = PrometheusMetricsPlugin()
+        cp = await create_test_charge_point("TEST001", db_connection, plugins=[plugin])
+
+        # Send first meter value (normal reading)
+        meter_value1 = [
+            {
+                "timestamp": "2024-01-15T10:00:00Z",
+                "sampled_value": [
+                    {"value": "5000", "measurand": "Energy.Active.Import.Register"},
+                ],
+            }
+        ]
+        await cp.on_meter_values(connector_id=1, meter_value=meter_value1, transaction_id=None)
+
+        # Verify no jumps detected yet
+        value = get_metric_value(plugin.ocpp_energy_jump_total, {"cp_id": "TEST001"})
+        assert value is None or value == 0.0
+
+        # Send second meter value with normal increment (should not trigger)
+        meter_value2 = [
+            {
+                "timestamp": "2024-01-15T10:01:00Z",
+                "sampled_value": [
+                    {"value": "5100", "measurand": "Energy.Active.Import.Register"},
+                ],
+            }
+        ]
+        await cp.on_meter_values(connector_id=1, meter_value=meter_value2, transaction_id=None)
+
+        # Still no jumps (only 100 Wh difference)
+        value = get_metric_value(plugin.ocpp_energy_jump_total, {"cp_id": "TEST001"})
+        assert value is None or value == 0.0
+
+        # Send third meter value with large jump (>10,000 Wh)
+        meter_value3 = [
+            {
+                "timestamp": "2024-01-15T10:02:00Z",
+                "sampled_value": [
+                    {"value": "16000", "measurand": "Energy.Active.Import.Register"},
+                ],
+            }
+        ]
+        await cp.on_meter_values(connector_id=1, meter_value=meter_value3, transaction_id=None)
+
+        # Verify jump counter incremented (16000 - 5100 = 10900 Wh > 10000)
+        value = get_metric_value(plugin.ocpp_energy_jump_total, {"cp_id": "TEST001"})
+        assert value == 1.0
+
+        # Send another large jump
+        meter_value4 = [
+            {
+                "timestamp": "2024-01-15T10:03:00Z",
+                "sampled_value": [
+                    {"value": "27000", "measurand": "Energy.Active.Import.Register"},
+                ],
+            }
+        ]
+        await cp.on_meter_values(connector_id=1, meter_value=meter_value4, transaction_id=None)
+
+        # Verify counter incremented again (27000 - 16000 = 11000 Wh > 10000)
+        value = get_metric_value(plugin.ocpp_energy_jump_total, {"cp_id": "TEST001"})
+        assert value == 2.0
+
+    @pytest.mark.asyncio
+    async def test_energy_jump_detection_negative_jump(self, db_connection):
+        """Test that negative jumps (decreases) are also detected."""
+        plugin = PrometheusMetricsPlugin()
+        cp = await create_test_charge_point("TEST001", db_connection, plugins=[plugin])
+
+        # Send first meter value
+        meter_value1 = [
+            {
+                "timestamp": "2024-01-15T10:00:00Z",
+                "sampled_value": [
+                    {"value": "20000", "measurand": "Energy.Active.Import.Register"},
+                ],
+            }
+        ]
+        await cp.on_meter_values(connector_id=1, meter_value=meter_value1, transaction_id=None)
+
+        # Send meter value with large negative jump (abs value > 10,000)
+        meter_value2 = [
+            {
+                "timestamp": "2024-01-15T10:01:00Z",
+                "sampled_value": [
+                    {"value": "5000", "measurand": "Energy.Active.Import.Register"},
+                ],
+            }
+        ]
+        await cp.on_meter_values(connector_id=1, meter_value=meter_value2, transaction_id=None)
+
+        # Verify jump detected (abs(5000 - 20000) = 15000 > 10000)
+        value = get_metric_value(plugin.ocpp_energy_jump_total, {"cp_id": "TEST001"})
+        assert value == 1.0
+
+    @pytest.mark.asyncio
+    async def test_energy_jump_detection_multiple_charge_points(self, db_connection):
+        """Test that energy jumps are tracked separately per charge point."""
+        plugin = PrometheusMetricsPlugin()
+
+        # Create two charge points
+        cp1 = await create_test_charge_point("CP001", db_connection, plugins=[plugin])
+        cp2 = await create_test_charge_point("CP002", db_connection, plugins=[plugin])
+
+        # Send initial readings for both
+        meter_value1 = [
+            {
+                "timestamp": "2024-01-15T10:00:00Z",
+                "sampled_value": [
+                    {"value": "1000", "measurand": "Energy.Active.Import.Register"},
+                ],
+            }
+        ]
+        await cp1.on_meter_values(connector_id=1, meter_value=meter_value1, transaction_id=None)
+        await cp2.on_meter_values(connector_id=1, meter_value=meter_value1, transaction_id=None)
+
+        # Trigger jump on CP001 only
+        meter_value2 = [
+            {
+                "timestamp": "2024-01-15T10:01:00Z",
+                "sampled_value": [
+                    {"value": "12000", "measurand": "Energy.Active.Import.Register"},
+                ],
+            }
+        ]
+        await cp1.on_meter_values(connector_id=1, meter_value=meter_value2, transaction_id=None)
+
+        # Verify CP001 has jump, CP002 does not
+        value1 = get_metric_value(plugin.ocpp_energy_jump_total, {"cp_id": "CP001"})
+        value2 = get_metric_value(plugin.ocpp_energy_jump_total, {"cp_id": "CP002"})
+        assert value1 == 1.0
+        assert value2 is None or value2 == 0.0
+
+    @pytest.mark.asyncio
     async def test_message_latency_tracking(self, db_connection):
         """Test that message handling latency is recorded."""
         plugin = PrometheusMetricsPlugin()
