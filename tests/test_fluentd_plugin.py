@@ -71,6 +71,20 @@ class TestFluentdAuditPlugin:
             plugin = FluentdAuditPlugin()
             cp = await create_test_charge_point("TEST001", db_connection, plugins=[plugin])
 
+            # Simulate raw message (would be set by route_message in production)
+            raw_msg = [
+                2,
+                "msg-123",
+                "BootNotification",
+                {
+                    "chargePointVendor": "TestVendor",
+                    "chargePointModel": "TestModel",
+                    "firmwareVersion": "1.0.0",
+                    "chargePointSerialNumber": "SN-123",
+                },
+            ]
+            cp._current_raw_message = raw_msg
+
             # Trigger boot notification
             await cp.on_boot_notification(
                 charge_point_vendor="TestVendor",
@@ -88,13 +102,14 @@ class TestFluentdAuditPlugin:
 
             assert event_data["type"] == "ocpp"
             assert event_data["cp"] == "TEST001"
-            assert event_data["dir"] == "received"
+            assert event_data["dir"] == "recv"
             assert "msg" in event_data
+            # msg is now the raw OCPP message array
             msg = event_data["msg"]
-            assert msg["charge_point_vendor"] == "TestVendor"
-            assert msg["charge_point_model"] == "TestModel"
-            assert msg["firmware_version"] == "1.0.0"
-            assert msg["charge_point_serial_number"] == "SN-123"
+            assert msg[0] == 2  # CALL type
+            assert msg[2] == "BootNotification"
+            assert msg[3]["chargePointVendor"] == "TestVendor"
+            assert msg[3]["chargePointModel"] == "TestModel"
 
     @pytest.mark.asyncio
     async def test_status_notification_logging(self, db_connection):
@@ -105,6 +120,15 @@ class TestFluentdAuditPlugin:
 
             plugin = FluentdAuditPlugin()
             cp = await create_test_charge_point("TEST001", db_connection, plugins=[plugin])
+
+            # Simulate raw message
+            raw_msg = [
+                2,
+                "msg-456",
+                "StatusNotification",
+                {"connectorId": 1, "errorCode": "NoError", "status": "Charging"},
+            ]
+            cp._current_raw_message = raw_msg
 
             # Trigger status notification
             await cp.on_status_notification(
@@ -122,12 +146,13 @@ class TestFluentdAuditPlugin:
 
             assert event_data["type"] == "ocpp"
             assert event_data["cp"] == "TEST001"
-            assert event_data["dir"] == "received"
+            assert event_data["dir"] == "recv"
             assert "msg" in event_data
+            # msg is now the raw OCPP message array
             msg = event_data["msg"]
-            assert msg["connector_id"] == 1
-            assert msg["status"] == ChargePointStatus.charging
-            assert msg["error_code"] == "NoError"
+            assert msg[0] == 2
+            assert msg[2] == "StatusNotification"
+            assert msg[3]["connectorId"] == 1
 
     @pytest.mark.asyncio
     async def test_transaction_start_logging(self, db_connection):
@@ -138,6 +163,20 @@ class TestFluentdAuditPlugin:
 
             plugin = FluentdAuditPlugin()
             cp = await create_test_charge_point("TEST001", db_connection, plugins=[plugin])
+
+            # Simulate raw message
+            raw_msg = [
+                2,
+                "msg-789",
+                "StartTransaction",
+                {
+                    "connectorId": 1,
+                    "idTag": "USER-123",
+                    "meterStart": 1000,
+                    "timestamp": "2024-01-15T10:00:00Z",
+                },
+            ]
+            cp._current_raw_message = raw_msg
 
             # Start transaction
             await cp.on_start_transaction(
@@ -156,12 +195,14 @@ class TestFluentdAuditPlugin:
 
             assert event_data["type"] == "ocpp"
             assert event_data["cp"] == "TEST001"
-            assert event_data["dir"] == "received"
+            assert event_data["dir"] == "recv"
             assert "msg" in event_data
+            # msg is now the raw OCPP message array
             msg = event_data["msg"]
-            assert msg["connector_id"] == 1
-            assert msg["id_tag"] == "USER-123"
-            assert msg["meter_start"] == 1000
+            assert msg[0] == 2
+            assert msg[2] == "StartTransaction"
+            assert msg[3]["connectorId"] == 1
+            assert msg[3]["idTag"] == "USER-123"
 
     @pytest.mark.asyncio
     async def test_transaction_stop_logging(self, db_connection):
@@ -190,6 +231,20 @@ class TestFluentdAuditPlugin:
             # Reset mock to clear boot notification call
             mock_sender.emit.reset_mock()
 
+            # Simulate raw message
+            raw_msg = [
+                2,
+                "msg-stop",
+                "StopTransaction",
+                {
+                    "transactionId": tx.id,
+                    "meterStop": 5000,
+                    "timestamp": "2024-01-15T11:00:00Z",
+                    "reason": "Local",
+                },
+            ]
+            cp._current_raw_message = raw_msg
+
             # Stop transaction
             await cp.on_stop_transaction(
                 transaction_id=tx.id,
@@ -207,12 +262,14 @@ class TestFluentdAuditPlugin:
 
             assert event_data["type"] == "ocpp"
             assert event_data["cp"] == "TEST001"
-            assert event_data["dir"] == "received"
+            assert event_data["dir"] == "recv"
             assert "msg" in event_data
+            # msg is now the raw OCPP message array
             msg = event_data["msg"]
-            assert msg["transaction_id"] == tx.id
-            assert msg["meter_stop"] == 5000
-            assert msg["reason"] == "Local"
+            assert msg[0] == 2
+            assert msg[2] == "StopTransaction"
+            assert msg[3]["transactionId"] == tx.id
+            assert msg[3]["meterStop"] == 5000
 
     @pytest.mark.asyncio
     async def test_heartbeat_logging(self, db_connection):
@@ -239,7 +296,7 @@ class TestFluentdAuditPlugin:
 
             assert event_data["type"] == "ocpp"
             assert event_data["cp"] == "TEST001"
-            assert event_data["dir"] == "received"
+            assert event_data["dir"] == "recv"
             assert "msg" in event_data
 
     @pytest.mark.asyncio
@@ -280,6 +337,19 @@ class TestFluentdAuditPlugin:
                 }
             ]
 
+            # Simulate raw message
+            raw_msg = [
+                2,
+                "msg-meter",
+                "MeterValues",
+                {
+                    "connectorId": 1,
+                    "transactionId": tx.id,
+                    "meterValue": meter_value,
+                },
+            ]
+            cp._current_raw_message = raw_msg
+
             await cp.on_meter_values(connector_id=1, meter_value=meter_value, transaction_id=tx.id)
 
             # Verify event was emitted
@@ -291,12 +361,14 @@ class TestFluentdAuditPlugin:
 
             assert event_data["type"] == "ocpp"
             assert event_data["cp"] == "TEST001"
-            assert event_data["dir"] == "received"
+            assert event_data["dir"] == "recv"
             assert "msg" in event_data
+            # msg is now the raw OCPP message array
             msg = event_data["msg"]
-            assert msg["connector_id"] == 1
-            assert msg["transaction_id"] == tx.id
-            assert len(msg["meter_value"]) == 1
+            assert msg[0] == 2
+            assert msg[2] == "MeterValues"
+            assert msg[3]["connectorId"] == 1
+            assert msg[3]["transactionId"] == tx.id
 
     @pytest.mark.asyncio
     async def test_cleanup_closes_sender(self, db_connection):

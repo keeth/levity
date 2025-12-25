@@ -20,7 +20,7 @@ class FluentdAuditPlugin(ChargePointPlugin):
     {
         "type": "ocpp",
         "cp": "CP001",
-        "dir": "received",
+        "dir": "recv",
         "msg": {
             "charge_point_vendor": "TestVendor",
             "charge_point_model": "TestModel",
@@ -120,8 +120,8 @@ class FluentdAuditPlugin(ChargePointPlugin):
         return {
             "type": "ocpp",
             "cp": context.charge_point.id,
-            "dir": "received",
-            "msg": context.message_data,
+            "dir": "recv",
+            "msg": context.raw_message,
         }
 
     async def log_boot_notification(self, context: PluginContext):

@@ -56,11 +56,13 @@ class PluginContext:
     Contains:
     - charge_point: Reference to the LevityChargePoint instance
     - message_data: The parsed OCPP message data (kwargs from handler)
+    - raw_message: The raw OCPP message as received (array format)
     - result: The result from the handler (only available in AFTER hooks)
     """
 
     charge_point: "LevityChargePoint"
     message_data: dict[str, Any]
+    raw_message: list[Any] | None = None
     result: Any = None
 
 

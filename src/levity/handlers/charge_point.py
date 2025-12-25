@@ -61,10 +61,15 @@ class LevityChargePoint(BaseChargePoint):
         self._plugin_hooks: dict[PluginHook, list[tuple[ChargePointPlugin, str]]] = {}
         self._register_plugins()
 
+        # Store the current raw message for plugins
+        self._current_raw_message: list | None = None
+
     async def route_message(self, raw_message: str):
         """Override to log incoming OCPP messages."""
         try:
             message = json.loads(raw_message)
+            # Store raw message for plugins
+            self._current_raw_message = message
             message_type = message[0]
             message_id = message[1] if len(message) > 1 else None
 
@@ -548,6 +553,7 @@ class LevityChargePoint(BaseChargePoint):
         context = PluginContext(
             charge_point=self,
             message_data=message_data,
+            raw_message=self._current_raw_message,
             result=result,
         )
 
