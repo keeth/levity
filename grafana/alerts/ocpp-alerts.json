@@ -211,6 +211,76 @@
         "severity": "critical",
         "component": "charge_point"
       }
+    },
+    {
+      "uid": "central-call-timeout",
+      "title": "Central System Call Timeout",
+      "condition": "A",
+      "data": [
+        {
+          "refId": "A",
+          "queryType": "",
+          "relativeTimeRange": {
+            "from": 300,
+            "to": 0
+          },
+          "datasourceUid": "${DS_PROMETHEUS}",
+          "model": {
+            "expr": "increase(ocpp_central_call_errors_total{error_type=\"timeout\"}[5m]) > 0",
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${DS_PROMETHEUS}"
+            }
+          }
+        }
+      ],
+      "noDataState": "NoData",
+      "execErrState": "Alerting",
+      "for": "0s",
+      "annotations": {
+        "description": "Central system command {{$labels.action}} to {{$labels.cp_id}} timed out ({{$value}} timeouts in last 5 minutes).",
+        "summary": "Command timeout for {{$labels.cp_id}}: {{$labels.action}}"
+      },
+      "labels": {
+        "severity": "warning",
+        "component": "central_system"
+      }
+    },
+    {
+      "uid": "central-call-rejected",
+      "title": "Central System Call Rejected",
+      "condition": "A",
+      "data": [
+        {
+          "refId": "A",
+          "queryType": "",
+          "relativeTimeRange": {
+            "from": 300,
+            "to": 0
+          },
+          "datasourceUid": "${DS_PROMETHEUS}",
+          "model": {
+            "expr": "increase(ocpp_central_call_rejected_total[5m]) > 0",
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${DS_PROMETHEUS}"
+            }
+          }
+        }
+      ],
+      "noDataState": "NoData",
+      "execErrState": "Alerting",
+      "for": "0s",
+      "annotations": {
+        "description": "Central system command {{$labels.action}} to {{$labels.cp_id}} was rejected with status: {{$labels.status}} ({{$value}} rejections in last 5 minutes).",
+        "summary": "Command rejected for {{$labels.cp_id}}: {{$labels.action}} ({{$labels.status}})"
+      },
+      "labels": {
+        "severity": "info",
+        "component": "central_system"
+      }
     }
   ]
 }

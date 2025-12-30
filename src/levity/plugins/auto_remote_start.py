@@ -6,6 +6,7 @@ from ocpp.v16 import call
 from ocpp.v16.enums import ChargePointStatus
 
 from .base import ChargePointPlugin, PluginContext, PluginHook
+from .prometheus_metrics import PrometheusMetricsPlugin
 
 
 class AutoRemoteStartPlugin(ChargePointPlugin):
@@ -63,6 +64,7 @@ class AutoRemoteStartPlugin(ChargePointPlugin):
         await asyncio.sleep(self.delay_seconds)
 
         # Send RemoteStartTransaction
+        cp_id = context.charge_point.id
         try:
             request = call.RemoteStartTransaction(
                 connector_id=connector_id,
@@ -73,12 +75,33 @@ class AutoRemoteStartPlugin(ChargePointPlugin):
 
             if response.status != "Accepted":
                 self.logger.warning(
-                    f"RemoteStartTransaction rejected for {context.charge_point.id} "
+                    f"RemoteStartTransaction rejected for {cp_id} "
                     f"connector {connector_id}: {response.status}"
                 )
+                PrometheusMetricsPlugin.record_call_rejected(
+                    cp_id=cp_id,
+                    action="RemoteStartTransaction",
+                    status=response.status,
+                )
+
+        except TimeoutError as e:
+            self.logger.error(
+                f"Timeout sending RemoteStartTransaction to {cp_id}: {e}",
+                exc_info=True,
+            )
+            PrometheusMetricsPlugin.record_call_error(
+                cp_id=cp_id,
+                action="RemoteStartTransaction",
+                error_type="timeout",
+            )
 
         except Exception as e:
             self.logger.error(
-                f"Failed to send RemoteStartTransaction to {context.charge_point.id}: {e}",
+                f"Failed to send RemoteStartTransaction to {cp_id}: {e}",
                 exc_info=True,
+            )
+            PrometheusMetricsPlugin.record_call_error(
+                cp_id=cp_id,
+                action="RemoteStartTransaction",
+                error_type=type(e).__name__,
             )

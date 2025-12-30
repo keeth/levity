@@ -137,6 +137,51 @@ class PrometheusMetricsPlugin(ChargePointPlugin):
         labelnames=["cp_id"],
     )
 
+    # Central system call errors (timeouts, rejections when sending commands to CPs)
+    ocpp_central_call_errors_total = Counter(
+        "ocpp_central_call_errors_total",
+        "Total number of errors when central system sends commands to charge points",
+        labelnames=["cp_id", "action", "error_type"],
+    )
+
+    ocpp_central_call_rejected_total = Counter(
+        "ocpp_central_call_rejected_total",
+        "Total number of rejected responses when central system sends commands to charge points",
+        labelnames=["cp_id", "action", "status"],
+    )
+
+    @classmethod
+    def record_call_error(cls, cp_id: str, action: str, error_type: str):
+        """
+        Record an error when the central system sends a command to a charge point.
+
+        Args:
+            cp_id: Charge point ID
+            action: OCPP action name (e.g., "RemoteStartTransaction")
+            error_type: Type of error (e.g., "timeout", "connection_error")
+        """
+        cls.ocpp_central_call_errors_total.labels(
+            cp_id=cp_id,
+            action=action,
+            error_type=error_type,
+        ).inc()
+
+    @classmethod
+    def record_call_rejected(cls, cp_id: str, action: str, status: str):
+        """
+        Record a rejected response when the central system sends a command.
+
+        Args:
+            cp_id: Charge point ID
+            action: OCPP action name (e.g., "RemoteStartTransaction")
+            status: Rejection status (e.g., "Rejected", "NotSupported")
+        """
+        cls.ocpp_central_call_rejected_total.labels(
+            cp_id=cp_id,
+            action=action,
+            status=status,
+        ).inc()
+
     def __init__(self):
         """Initialize the Prometheus metrics plugin."""
         super().__init__()
@@ -181,7 +226,7 @@ class PrometheusMetricsPlugin(ChargePointPlugin):
     async def cleanup(self, charge_point):
         """Mark charge point as disconnected and increment disconnect counter."""
         cp_id = charge_point.id
-        
+
         # Check if there are active transactions when disconnecting
         # This indicates a reconnect/reboot during an active transaction
         active_txs = await charge_point.tx_repo.get_all_active_for_cp(cp_id)
@@ -189,7 +234,7 @@ class PrometheusMetricsPlugin(ChargePointPlugin):
             # Increment counter for each active transaction
             for _ in active_txs:
                 self.ocpp_cp_reconnect_during_tx_total.labels(cp_id=cp_id).inc()
-        
+
         self.ocpp_cp_connected.labels(cp_id=cp_id).set(0)
         self.ocpp_cp_disconnects_total.labels(cp_id=cp_id).inc()
 
