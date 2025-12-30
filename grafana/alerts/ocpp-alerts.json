@@ -1,0 +1,217 @@
+{
+  "name": "OCPP Central System Alerts",
+  "interval": "1m",
+  "rules": [
+    {
+      "uid": "cp-multiple-reboots",
+      "title": "Charge Point Multiple Reboots",
+      "condition": "A",
+      "data": [
+        {
+          "refId": "A",
+          "queryType": "",
+          "relativeTimeRange": {
+            "from": 86400,
+            "to": 0
+          },
+          "datasourceUid": "${DS_PROMETHEUS}",
+          "model": {
+            "expr": "increase(ocpp_cp_boots_total[1d]) > 1",
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${DS_PROMETHEUS}"
+            }
+          }
+        }
+      ],
+      "noDataState": "NoData",
+      "execErrState": "Alerting",
+      "for": "0s",
+      "annotations": {
+        "description": "Charge point {{$labels.cp_id}} has rebooted more than once in the last 24 hours ({{$value}} reboots).",
+        "summary": "Multiple reboots detected for {{$labels.cp_id}}"
+      },
+      "labels": {
+        "severity": "warning",
+        "component": "charge_point"
+      }
+    },
+    {
+      "uid": "cp-multiple-disconnects",
+      "title": "Charge Point Multiple Disconnects",
+      "condition": "A",
+      "data": [
+        {
+          "refId": "A",
+          "queryType": "",
+          "relativeTimeRange": {
+            "from": 86400,
+            "to": 0
+          },
+          "datasourceUid": "${DS_PROMETHEUS}",
+          "model": {
+            "expr": "increase(ocpp_cp_disconnects_total[1d]) > 1",
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${DS_PROMETHEUS}"
+            }
+          }
+        }
+      ],
+      "noDataState": "NoData",
+      "execErrState": "Alerting",
+      "for": "0s",
+      "annotations": {
+        "description": "Charge point {{$labels.cp_id}} has disconnected more than once in the last 24 hours ({{$value}} disconnects).",
+        "summary": "Multiple disconnects detected for {{$labels.cp_id}}"
+      },
+      "labels": {
+        "severity": "warning",
+        "component": "charge_point"
+      }
+    },
+    {
+      "uid": "cp-error-detected",
+      "title": "Charge Point Error Detected",
+      "condition": "A",
+      "data": [
+        {
+          "refId": "A",
+          "queryType": "",
+          "relativeTimeRange": {
+            "from": 300,
+            "to": 0
+          },
+          "datasourceUid": "${DS_PROMETHEUS}",
+          "model": {
+            "expr": "increase(ocpp_cp_errors_total[5m]) > 0",
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${DS_PROMETHEUS}"
+            }
+          }
+        }
+      ],
+      "noDataState": "NoData",
+      "execErrState": "Alerting",
+      "for": "0s",
+      "annotations": {
+        "description": "Charge point {{$labels.cp_id}} has reported an error: {{$labels.error_type}} ({{$value}} errors in last 5 minutes).",
+        "summary": "Error detected for {{$labels.cp_id}}: {{$labels.error_type}}"
+      },
+      "labels": {
+        "severity": "critical",
+        "component": "charge_point"
+      }
+    },
+    {
+      "uid": "cp-heartbeat-stale",
+      "title": "Charge Point Stale Heartbeat",
+      "condition": "A",
+      "data": [
+        {
+          "refId": "A",
+          "queryType": "",
+          "relativeTimeRange": {
+            "from": 300,
+            "to": 0
+          },
+          "datasourceUid": "${DS_PROMETHEUS}",
+          "model": {
+            "expr": "(time() - ocpp_cp_last_heartbeat_ts) > 86400",
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${DS_PROMETHEUS}"
+            }
+          }
+        }
+      ],
+      "noDataState": "NoData",
+      "execErrState": "Alerting",
+      "for": "0s",
+      "annotations": {
+        "description": "Charge point {{$labels.cp_id}} last heartbeat was {{$value | humanizeDuration}} ago (more than 1 day).",
+        "summary": "Stale heartbeat for {{$labels.cp_id}}"
+      },
+      "labels": {
+        "severity": "warning",
+        "component": "charge_point"
+      }
+    },
+    {
+      "uid": "cp-tx-stale",
+      "title": "Charge Point Stale Transaction",
+      "condition": "A",
+      "data": [
+        {
+          "refId": "A",
+          "queryType": "",
+          "relativeTimeRange": {
+            "from": 300,
+            "to": 0
+          },
+          "datasourceUid": "${DS_PROMETHEUS}",
+          "model": {
+            "expr": "(time() - ocpp_cp_last_tx_ts) > 1209600",
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${DS_PROMETHEUS}"
+            }
+          }
+        }
+      ],
+      "noDataState": "NoData",
+      "execErrState": "Alerting",
+      "for": "0s",
+      "annotations": {
+        "description": "Charge point {{$labels.cp_id}} last transaction was {{$value | humanizeDuration}} ago (more than 2 weeks).",
+        "summary": "Stale transaction for {{$labels.cp_id}}"
+      },
+      "labels": {
+        "severity": "info",
+        "component": "charge_point"
+      }
+    },
+    {
+      "uid": "cp-reboot-during-tx",
+      "title": "Charge Point Reboot During Transaction",
+      "condition": "A",
+      "data": [
+        {
+          "refId": "A",
+          "queryType": "",
+          "relativeTimeRange": {
+            "from": 300,
+            "to": 0
+          },
+          "datasourceUid": "${DS_PROMETHEUS}",
+          "model": {
+            "expr": "increase(ocpp_cp_reconnect_during_tx_total[5m]) > 0",
+            "refId": "A",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${DS_PROMETHEUS}"
+            }
+          }
+        }
+      ],
+      "noDataState": "NoData",
+      "execErrState": "Alerting",
+      "for": "0s",
+      "annotations": {
+        "description": "Charge point {{$labels.cp_id}} has rebooted/reconnected during an active transaction ({{$value}} occurrences in last 5 minutes).",
+        "summary": "Reboot during transaction for {{$labels.cp_id}}"
+      },
+      "labels": {
+        "severity": "critical",
+        "component": "charge_point"
+      }
+    }
+  ]
+}
+

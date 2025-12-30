@@ -93,12 +93,14 @@ class TestFluentdAuditPlugin:
                 charge_point_serial_number="SN-123",
             )
 
-            # Verify event was emitted
-            mock_sender.emit.assert_called()
-            call_args = mock_sender.emit.call_args
+            # Verify events were emitted (request and response)
+            assert mock_sender.emit.call_count == 2
+            all_calls = mock_sender.emit.call_args_list
 
-            assert call_args[0][0] == "boot"  # Tag
-            event_data = call_args[0][1]  # Data
+            # First call is the received message
+            recv_call = all_calls[0]
+            assert recv_call[0][0] == "boot"  # Tag
+            event_data = recv_call[0][1]  # Data
 
             assert event_data["type"] == "ocpp"
             assert event_data["cp"] == "TEST001"
@@ -110,6 +112,14 @@ class TestFluentdAuditPlugin:
             assert msg[2] == "BootNotification"
             assert msg[3]["chargePointVendor"] == "TestVendor"
             assert msg[3]["chargePointModel"] == "TestModel"
+
+            # Second call is the response
+            sent_call = all_calls[1]
+            assert sent_call[0][0] == "boot.response"
+            response_data = sent_call[0][1]
+            assert response_data["type"] == "ocpp"
+            assert response_data["cp"] == "TEST001"
+            assert response_data["dir"] == "send"
 
     @pytest.mark.asyncio
     async def test_status_notification_logging(self, db_connection):
@@ -137,12 +147,14 @@ class TestFluentdAuditPlugin:
                 status=ChargePointStatus.charging,
             )
 
-            # Verify event was emitted
-            mock_sender.emit.assert_called()
-            call_args = mock_sender.emit.call_args
+            # Verify events were emitted (request and response)
+            assert mock_sender.emit.call_count == 2
+            all_calls = mock_sender.emit.call_args_list
 
-            assert call_args[0][0] == "status"
-            event_data = call_args[0][1]
+            # First call is the received message
+            recv_call = all_calls[0]
+            assert recv_call[0][0] == "status"
+            event_data = recv_call[0][1]
 
             assert event_data["type"] == "ocpp"
             assert event_data["cp"] == "TEST001"
@@ -153,6 +165,11 @@ class TestFluentdAuditPlugin:
             assert msg[0] == 2
             assert msg[2] == "StatusNotification"
             assert msg[3]["connectorId"] == 1
+
+            # Second call is the response
+            sent_call = all_calls[1]
+            assert sent_call[0][0] == "status.response"
+            assert sent_call[0][1]["dir"] == "send"
 
     @pytest.mark.asyncio
     async def test_transaction_start_logging(self, db_connection):
@@ -186,12 +203,14 @@ class TestFluentdAuditPlugin:
                 timestamp="2024-01-15T10:00:00Z",
             )
 
-            # Verify event was emitted
-            mock_sender.emit.assert_called()
-            call_args = mock_sender.emit.call_args
+            # Verify events were emitted (request and response)
+            assert mock_sender.emit.call_count == 2
+            all_calls = mock_sender.emit.call_args_list
 
-            assert call_args[0][0] == "transaction.start"
-            event_data = call_args[0][1]
+            # First call is the received message
+            recv_call = all_calls[0]
+            assert recv_call[0][0] == "transaction.start"
+            event_data = recv_call[0][1]
 
             assert event_data["type"] == "ocpp"
             assert event_data["cp"] == "TEST001"
@@ -203,6 +222,11 @@ class TestFluentdAuditPlugin:
             assert msg[2] == "StartTransaction"
             assert msg[3]["connectorId"] == 1
             assert msg[3]["idTag"] == "USER-123"
+
+            # Second call is the response
+            sent_call = all_calls[1]
+            assert sent_call[0][0] == "transaction.start.response"
+            assert sent_call[0][1]["dir"] == "send"
 
     @pytest.mark.asyncio
     async def test_transaction_stop_logging(self, db_connection):
@@ -253,12 +277,14 @@ class TestFluentdAuditPlugin:
                 reason="Local",
             )
 
-            # Verify event was emitted
-            mock_sender.emit.assert_called()
-            call_args = mock_sender.emit.call_args
+            # Verify events were emitted (request and response)
+            assert mock_sender.emit.call_count == 2
+            all_calls = mock_sender.emit.call_args_list
 
-            assert call_args[0][0] == "transaction.stop"
-            event_data = call_args[0][1]
+            # First call is the received message
+            recv_call = all_calls[0]
+            assert recv_call[0][0] == "transaction.stop"
+            event_data = recv_call[0][1]
 
             assert event_data["type"] == "ocpp"
             assert event_data["cp"] == "TEST001"
@@ -270,6 +296,11 @@ class TestFluentdAuditPlugin:
             assert msg[2] == "StopTransaction"
             assert msg[3]["transactionId"] == tx.id
             assert msg[3]["meterStop"] == 5000
+
+            # Second call is the response
+            sent_call = all_calls[1]
+            assert sent_call[0][0] == "transaction.stop.response"
+            assert sent_call[0][1]["dir"] == "send"
 
     @pytest.mark.asyncio
     async def test_heartbeat_logging(self, db_connection):
@@ -287,17 +318,24 @@ class TestFluentdAuditPlugin:
             # Send heartbeat
             await cp.on_heartbeat()
 
-            # Verify event was emitted
-            mock_sender.emit.assert_called()
-            call_args = mock_sender.emit.call_args
+            # Verify events were emitted (request and response)
+            assert mock_sender.emit.call_count == 2
+            all_calls = mock_sender.emit.call_args_list
 
-            assert call_args[0][0] == "heartbeat"
-            event_data = call_args[0][1]
+            # First call is the received message
+            recv_call = all_calls[0]
+            assert recv_call[0][0] == "heartbeat"
+            event_data = recv_call[0][1]
 
             assert event_data["type"] == "ocpp"
             assert event_data["cp"] == "TEST001"
             assert event_data["dir"] == "recv"
             assert "msg" in event_data
+
+            # Second call is the response
+            sent_call = all_calls[1]
+            assert sent_call[0][0] == "heartbeat.response"
+            assert sent_call[0][1]["dir"] == "send"
 
     @pytest.mark.asyncio
     async def test_meter_values_logging(self, db_connection):
@@ -352,12 +390,14 @@ class TestFluentdAuditPlugin:
 
             await cp.on_meter_values(connector_id=1, meter_value=meter_value, transaction_id=tx.id)
 
-            # Verify event was emitted
-            mock_sender.emit.assert_called()
-            call_args = mock_sender.emit.call_args
+            # Verify events were emitted (request and response)
+            assert mock_sender.emit.call_count == 2
+            all_calls = mock_sender.emit.call_args_list
 
-            assert call_args[0][0] == "meter"
-            event_data = call_args[0][1]
+            # First call is the received message
+            recv_call = all_calls[0]
+            assert recv_call[0][0] == "meter"
+            event_data = recv_call[0][1]
 
             assert event_data["type"] == "ocpp"
             assert event_data["cp"] == "TEST001"
@@ -369,6 +409,11 @@ class TestFluentdAuditPlugin:
             assert msg[2] == "MeterValues"
             assert msg[3]["connectorId"] == 1
             assert msg[3]["transactionId"] == tx.id
+
+            # Second call is the response
+            sent_call = all_calls[1]
+            assert sent_call[0][0] == "meter.response"
+            assert sent_call[0][1]["dir"] == "send"
 
     @pytest.mark.asyncio
     async def test_cleanup_closes_sender(self, db_connection):

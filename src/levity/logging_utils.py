@@ -52,23 +52,34 @@ def log_ocpp_message(
         message_id: OCPP message ID
         action: OCPP action name (e.g., "BootNotification")
         payload: Message payload
-        **kwargs: Additional fields to include
+        **kwargs: Additional fields to include (remote_address, etc.)
     """
-    event_data = {
-        "direction": direction,
-        "cp_id": cp_id,
-        "message_type": message_type,
+    # Convert direction to short form matching Fluentd format
+    dir_short = "recv" if direction == "received" else "send"
+
+    # Build msg dict with message details
+    msg: dict[str, Any] = {"message_type": message_type}
+    if message_id is not None:
+        msg["message_id"] = message_id
+    if action is not None:
+        msg["action"] = action
+    if payload is not None:
+        msg["payload"] = payload
+
+    # Add error details if present in kwargs
+    for key in ["error_code", "error_description", "error_details"]:
+        if key in kwargs and kwargs[key] is not None:
+            msg[key] = kwargs.pop(key)
+
+    # Use Fluentd-style keys
+    event_data: dict[str, Any] = {
+        "type": "ocpp",
+        "cp": cp_id,
+        "dir": dir_short,
+        "msg": msg,
     }
 
-    # Only include optional fields if they're not None
-    if message_id is not None:
-        event_data["message_id"] = message_id
-    if action is not None:
-        event_data["action"] = action
-    if payload is not None:
-        event_data["payload"] = payload
-
-    # Filter out None values from kwargs
+    # Filter out None values from remaining kwargs (remote_address, etc.)
     for key, value in kwargs.items():
         if value is not None:
             event_data[key] = value
@@ -78,7 +89,7 @@ def log_ocpp_message(
         "event_data": event_data,
     }
 
-    logger.info(f"OCPP {direction}: {action or message_type}", extra=extra)
+    logger.info(f"OCPP {dir_short}: {action or message_type}", extra=extra)
 
 
 def log_websocket_event(
@@ -94,15 +105,17 @@ def log_websocket_event(
         logger: Logger instance
         event: Event name (e.g., "connect", "disconnect", "error")
         cp_id: Charge point ID (if applicable)
-        **kwargs: Additional fields to include
+        **kwargs: Additional fields to include (remote_address, reason, etc.)
     """
-    event_data = {
+    # Use Fluentd-style keys
+    event_data: dict[str, Any] = {
+        "type": "ws",
         "event": event,
     }
 
-    # Only include cp_id if it's not None
+    # Only include cp if it's not None
     if cp_id is not None:
-        event_data["cp_id"] = cp_id
+        event_data["cp"] = cp_id
 
     # Filter out None values from kwargs
     for key, value in kwargs.items():
@@ -135,13 +148,15 @@ def log_error(
         exc_info: Exception object (will extract traceback)
         **kwargs: Additional fields to include
     """
-    event_data = {
+    # Use Fluentd-style keys
+    event_data: dict[str, Any] = {
+        "type": "error",
         "error_type": error_type,
     }
 
-    # Only include cp_id if it's not None
+    # Only include cp if it's not None
     if cp_id is not None:
-        event_data["cp_id"] = cp_id
+        event_data["cp"] = cp_id
 
     # Filter out None values from kwargs
     for key, value in kwargs.items():

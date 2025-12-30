@@ -1,7 +1,10 @@
 """OCPP Charge Point handler with database integration."""
 
+import asyncio
+import contextlib
 import json
 import logging
+import time
 from datetime import UTC, datetime
 
 import aiosqlite
@@ -45,10 +48,17 @@ class LevityChargePoint(BaseChargePoint):
         plugins: list[ChargePointPlugin] | None = None,
         heartbeat_interval: int = 60,
         response_timeout: int = 30,
+        remote_address: str | None = None,
     ):
         super().__init__(id, connection, response_timeout=response_timeout)
         self.db = db_connection
         self.heartbeat_interval = heartbeat_interval
+        self.remote_address = remote_address
+
+        # Heartbeat watchdog: disconnect after 3x heartbeat interval with no heartbeats
+        self.heartbeat_timeout = heartbeat_interval * 3
+        self._last_heartbeat_time: float = time.time()  # Initialize to now
+        self._watchdog_task: asyncio.Task | None = None
 
         # Initialize repositories
         self.cp_repo = ChargePointRepository(db_connection)
@@ -84,6 +94,7 @@ class LevityChargePoint(BaseChargePoint):
                     message_id=message_id,
                     action=action,
                     payload=payload,
+                    remote_address=self.remote_address,
                 )
             elif message_type == 3:  # CALLRESULT
                 payload = message[2] if len(message) > 2 else None
@@ -94,6 +105,7 @@ class LevityChargePoint(BaseChargePoint):
                     message_type="CALLRESULT",
                     message_id=message_id,
                     payload=payload,
+                    remote_address=self.remote_address,
                 )
             elif message_type == 4:  # CALLERROR
                 error_code = message[2] if len(message) > 2 else None
@@ -108,6 +120,7 @@ class LevityChargePoint(BaseChargePoint):
                     error_code=error_code,
                     error_description=error_description,
                     error_details=error_details,
+                    remote_address=self.remote_address,
                 )
         except Exception as e:
             log_error(
@@ -132,6 +145,7 @@ class LevityChargePoint(BaseChargePoint):
                 message_type="CALL",
                 action=action,
                 payload=payload_dict,
+                remote_address=self.remote_address,
             )
         except Exception as e:
             log_error(
@@ -142,6 +156,50 @@ class LevityChargePoint(BaseChargePoint):
             )
 
         return await super().call(payload, suppress=suppress)
+
+    async def _send(self, message: str) -> None:
+        """Override to log all outgoing WebSocket messages (including CALLRESULT responses)."""
+        try:
+            parsed = json.loads(message)
+            message_type_id = parsed[0] if parsed else None
+            message_id = parsed[1] if len(parsed) > 1 else None
+
+            if message_type_id == 3:  # CALLRESULT
+                payload = parsed[2] if len(parsed) > 2 else None
+                log_ocpp_message(
+                    logger,
+                    direction="sent",
+                    cp_id=self.id,
+                    message_type="CALLRESULT",
+                    message_id=message_id,
+                    payload=payload,
+                    remote_address=self.remote_address,
+                )
+            elif message_type_id == 4:  # CALLERROR
+                error_code = parsed[2] if len(parsed) > 2 else None
+                error_description = parsed[3] if len(parsed) > 3 else None
+                error_details = parsed[4] if len(parsed) > 4 else None
+                log_ocpp_message(
+                    logger,
+                    direction="sent",
+                    cp_id=self.id,
+                    message_type="CALLERROR",
+                    message_id=message_id,
+                    error_code=error_code,
+                    error_description=error_description,
+                    error_details=error_details,
+                    remote_address=self.remote_address,
+                )
+            # Note: CALL messages (type 2) are already logged in the call() override
+        except Exception as e:
+            log_error(
+                logger,
+                "message_logging_error",
+                f"Failed to log outgoing message: {e}",
+                cp_id=self.id,
+            )
+
+        await super()._send(message)
 
     async def _ensure_charge_point_exists(self):
         """
@@ -219,6 +277,9 @@ class LevityChargePoint(BaseChargePoint):
         """
         # Ensure charge point exists before processing
         await self._ensure_charge_point_exists()
+
+        # Update in-memory heartbeat time for watchdog
+        self._last_heartbeat_time = time.time()
 
         # Execute BEFORE hooks
         message_data = {}
@@ -495,6 +556,53 @@ class LevityChargePoint(BaseChargePoint):
         self, charge_point_vendor: str, charge_point_model: str, **kwargs
     ):
         """Post-processing after BootNotification."""
+
+    async def start(self):
+        """Start the charge point message handler and heartbeat watchdog."""
+        # Start watchdog task
+        self._watchdog_task = asyncio.create_task(self._heartbeat_watchdog())
+        try:
+            await super().start()
+        finally:
+            # Cancel watchdog on disconnect
+            if self._watchdog_task:
+                self._watchdog_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await self._watchdog_task
+
+    async def _heartbeat_watchdog(self):
+        """Background task to detect stale heartbeats and disconnect."""
+        # Wait for first heartbeat timeout before starting monitoring
+        # This gives the charge point time to boot and send its first heartbeat
+        await asyncio.sleep(self.heartbeat_timeout)
+
+        while True:
+            try:
+                await asyncio.sleep(self.heartbeat_interval)
+
+                elapsed = time.time() - self._last_heartbeat_time
+
+                if elapsed > self.heartbeat_timeout:
+                    logger.warning(
+                        f"Charge point {self.id} heartbeat timeout "
+                        f"(last heartbeat {elapsed:.0f}s ago, timeout {self.heartbeat_timeout}s)",
+                        extra={
+                            "event_type": "heartbeat_timeout",
+                            "event_data": {
+                                "cp_id": self.id,
+                                "elapsed_seconds": elapsed,
+                                "timeout_seconds": self.heartbeat_timeout,
+                                "remote_address": self.remote_address,
+                            },
+                        },
+                    )
+                    # Close the WebSocket connection
+                    await self._connection.close(1000, "Heartbeat timeout")
+                    break
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.debug(f"Watchdog error for {self.id}: {e}")
 
     async def on_disconnect(self):
         """Handle charge point disconnection."""

@@ -87,7 +87,18 @@ class OCPPServer:
                 await connection.close(1002, "Missing charge point ID")
                 return
 
-            log_websocket_event(logger, "connect", cp_id=charge_point_id)
+            # Get remote address from connection
+            remote_address = None
+            try:
+                addr = connection.remote_address
+                if addr:
+                    remote_address = f"{addr[0]}:{addr[1]}" if len(addr) >= 2 else str(addr)
+            except Exception:
+                pass
+
+            log_websocket_event(
+                logger, "connect", cp_id=charge_point_id, remote_address=remote_address
+            )
 
             # Get database connection
             db_conn = await self.db.connect()
@@ -103,6 +114,7 @@ class OCPPServer:
                 plugins,
                 heartbeat_interval=self.heartbeat_interval,
                 response_timeout=self.response_timeout,
+                remote_address=remote_address,
             )
             self.charge_points[charge_point_id] = charge_point
 
@@ -136,9 +148,8 @@ class OCPPServer:
             await charge_point.start()
 
         except websockets.exceptions.ConnectionClosed:
-            log_websocket_event(
-                logger, "disconnect", cp_id=charge_point_id, reason="connection_closed"
-            )
+            # Reason will be logged in finally block
+            disconnect_reason = "connection_closed"
         except Exception as e:
             log_error(
                 logger,
@@ -147,12 +158,16 @@ class OCPPServer:
                 cp_id=charge_point_id,
                 exc_info=e,
             )
+            disconnect_reason = "error"
             # Try to close the connection gracefully
             try:
                 if connection.open:
                     await connection.close(1011, "Internal server error")
             except Exception:
                 pass
+        else:
+            # Normal exit (shouldn't happen as start() runs forever)
+            disconnect_reason = "normal"
         finally:
             # Clean up on disconnect
             if charge_point:
@@ -169,7 +184,13 @@ class OCPPServer:
             if charge_point_id and charge_point_id in self.charge_points:
                 del self.charge_points[charge_point_id]
             if charge_point_id:
-                log_websocket_event(logger, "disconnect", cp_id=charge_point_id)
+                log_websocket_event(
+                    logger,
+                    "disconnect",
+                    cp_id=charge_point_id,
+                    remote_address=remote_address if "remote_address" in dir() else None,
+                    reason=disconnect_reason if "disconnect_reason" in dir() else None,
+                )
 
     async def metrics_handler(self, request):
         """Handle /metrics endpoint for Prometheus."""

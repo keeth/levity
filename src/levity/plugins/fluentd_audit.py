@@ -115,49 +115,101 @@ class FluentdAuditPlugin(ChargePointPlugin):
         except Exception as e:
             self.logger.error(f"Failed to send event to Fluentd (tag={tag}): {e}")
 
-    def _base_event_data(self, context: PluginContext) -> dict:
+    def _base_event_data(
+        self, context: PluginContext, direction: str = "recv", message: Any = None
+    ) -> dict:
         """Create base event data with common fields in the new format."""
-        return {
+        data = {
             "type": "ocpp",
             "cp": context.charge_point.id,
-            "dir": "recv",
-            "msg": context.raw_message,
+            "dir": direction,
+            "msg": message if message is not None else context.raw_message,
         }
+        # Include client IP if available
+        if context.charge_point.remote_address:
+            data["remote_addr"] = context.charge_point.remote_address
+        return data
+
+    def _result_to_dict(self, result: Any) -> dict | None:
+        """Convert OCPP result object to dictionary."""
+        if result is None:
+            return None
+        if hasattr(result, "__dict__"):
+            # Handle dataclass-like objects
+            return {k: v for k, v in result.__dict__.items() if not k.startswith("_")}
+        return None
 
     async def log_boot_notification(self, context: PluginContext):
-        """Log boot notification event."""
+        """Log boot notification event (received and sent)."""
+        # Log received message
         data = self._base_event_data(context)
         await self._send_event("boot", data)
+        # Log sent response
+        if context.result:
+            response_data = self._base_event_data(
+                context, direction="send", message=self._result_to_dict(context.result)
+            )
+            await self._send_event("boot.response", response_data)
 
     async def log_heartbeat(self, context: PluginContext):
-        """Log heartbeat event."""
+        """Log heartbeat event (received and sent)."""
         data = self._base_event_data(context)
         await self._send_event("heartbeat", data)
+        if context.result:
+            response_data = self._base_event_data(
+                context, direction="send", message=self._result_to_dict(context.result)
+            )
+            await self._send_event("heartbeat.response", response_data)
 
     async def log_status_notification(self, context: PluginContext):
-        """Log status notification event."""
+        """Log status notification event (received and sent)."""
         data = self._base_event_data(context)
         await self._send_event("status", data)
+        if context.result:
+            response_data = self._base_event_data(
+                context, direction="send", message=self._result_to_dict(context.result)
+            )
+            await self._send_event("status.response", response_data)
 
     async def log_start_transaction(self, context: PluginContext):
-        """Log transaction start event."""
+        """Log transaction start event (received and sent)."""
         data = self._base_event_data(context)
         await self._send_event("transaction.start", data)
+        if context.result:
+            response_data = self._base_event_data(
+                context, direction="send", message=self._result_to_dict(context.result)
+            )
+            await self._send_event("transaction.start.response", response_data)
 
     async def log_stop_transaction(self, context: PluginContext):
-        """Log transaction stop event."""
+        """Log transaction stop event (received and sent)."""
         data = self._base_event_data(context)
         await self._send_event("transaction.stop", data)
+        if context.result:
+            response_data = self._base_event_data(
+                context, direction="send", message=self._result_to_dict(context.result)
+            )
+            await self._send_event("transaction.stop.response", response_data)
 
     async def log_meter_values(self, context: PluginContext):
-        """Log meter values event."""
+        """Log meter values event (received and sent)."""
         data = self._base_event_data(context)
         await self._send_event("meter", data)
+        if context.result:
+            response_data = self._base_event_data(
+                context, direction="send", message=self._result_to_dict(context.result)
+            )
+            await self._send_event("meter.response", response_data)
 
     async def log_authorize(self, context: PluginContext):
-        """Log authorization event."""
+        """Log authorization event (received and sent)."""
         data = self._base_event_data(context)
         await self._send_event("authorize", data)
+        if context.result:
+            response_data = self._base_event_data(
+                context, direction="send", message=self._result_to_dict(context.result)
+            )
+            await self._send_event("authorize.response", response_data)
 
 
 class FluentdWebSocketAuditPlugin(ChargePointPlugin):
@@ -218,6 +270,9 @@ class FluentdWebSocketAuditPlugin(ChargePointPlugin):
                 "cp": charge_point.id,
                 "event": "connect",
             }
+            # Include client IP if available
+            if charge_point.remote_address:
+                data["remote_addr"] = charge_point.remote_address
 
             await asyncio.to_thread(self.sender.emit, "websocket", data)
 
@@ -235,6 +290,10 @@ class FluentdWebSocketAuditPlugin(ChargePointPlugin):
                     "cp": charge_point.id,
                     "event": "disconnect",
                 }
+                # Include client IP if available
+                if charge_point.remote_address:
+                    data["remote_addr"] = charge_point.remote_address
+
                 await asyncio.to_thread(self.sender.emit, "websocket", data)
 
                 await asyncio.to_thread(self.sender.close)
