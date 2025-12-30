@@ -272,6 +272,10 @@ class TestPrometheusMetricsPlugin:
         plugin = PrometheusMetricsPlugin()
         cp = await create_test_charge_point("TEST001", db_connection, plugins=[plugin])
 
+        # Create connector for meter values (required for foreign key constraint)
+        connector = Connector(cp_id="TEST001", conn_id=1, status=ChargePointStatus.available)
+        connector = await cp.conn_repo.upsert(connector)
+
         # Send first meter value (normal reading)
         meter_value1 = [
             {
@@ -336,7 +340,12 @@ class TestPrometheusMetricsPlugin:
     async def test_energy_jump_detection_negative_jump(self, db_connection):
         """Test that negative jumps (decreases) are also detected."""
         plugin = PrometheusMetricsPlugin()
-        cp = await create_test_charge_point("TEST001", db_connection, plugins=[plugin])
+        # Use unique ID to avoid metric conflicts with other tests
+        cp = await create_test_charge_point("TEST_NEG_JUMP", db_connection, plugins=[plugin])
+
+        # Create connector for meter values (required for foreign key constraint)
+        connector = Connector(cp_id="TEST_NEG_JUMP", conn_id=1, status=ChargePointStatus.available)
+        connector = await cp.conn_repo.upsert(connector)
 
         # Send first meter value
         meter_value1 = [
@@ -361,7 +370,7 @@ class TestPrometheusMetricsPlugin:
         await cp.on_meter_values(connector_id=1, meter_value=meter_value2, transaction_id=None)
 
         # Verify jump detected (abs(5000 - 20000) = 15000 > 10000)
-        value = get_metric_value(plugin.ocpp_energy_jump_total, {"cp_id": "TEST001"})
+        value = get_metric_value(plugin.ocpp_energy_jump_total, {"cp_id": "TEST_NEG_JUMP"})
         assert value == 1.0
 
     @pytest.mark.asyncio
@@ -372,6 +381,12 @@ class TestPrometheusMetricsPlugin:
         # Create two charge points
         cp1 = await create_test_charge_point("CP001", db_connection, plugins=[plugin])
         cp2 = await create_test_charge_point("CP002", db_connection, plugins=[plugin])
+
+        # Create connectors for meter values (required for foreign key constraint)
+        connector1 = Connector(cp_id="CP001", conn_id=1, status=ChargePointStatus.available)
+        connector1 = await cp1.conn_repo.upsert(connector1)
+        connector2 = Connector(cp_id="CP002", conn_id=1, status=ChargePointStatus.available)
+        connector2 = await cp2.conn_repo.upsert(connector2)
 
         # Send initial readings for both
         meter_value1 = [

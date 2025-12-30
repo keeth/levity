@@ -1,9 +1,30 @@
 """Database connection management."""
 
 import logging
+import sqlite3
+from datetime import datetime
 from pathlib import Path
 
 import aiosqlite
+
+# Register datetime adapters to avoid Python 3.12+ deprecation warning
+# See: https://docs.python.org/3/library/sqlite3.html#adapter-and-converter-recipes
+
+
+def _adapt_datetime(val: datetime) -> str:
+    """Convert datetime to ISO format string for SQLite storage."""
+    return val.isoformat()
+
+
+def _convert_datetime(val: bytes) -> datetime:
+    """Convert ISO format string from SQLite to datetime."""
+    return datetime.fromisoformat(val.decode())
+
+
+# Register adapters and converters
+sqlite3.register_adapter(datetime, _adapt_datetime)
+sqlite3.register_converter("datetime", _convert_datetime)
+sqlite3.register_converter("DATETIME", _convert_datetime)
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +39,10 @@ class Database:
     async def connect(self) -> aiosqlite.Connection:
         """Establish database connection with optimized pragmas."""
         if self.connection is None:
-            self.connection = await aiosqlite.connect(self.db_path)
+            # Use PARSE_DECLTYPES to enable custom datetime converters
+            self.connection = await aiosqlite.connect(
+                self.db_path, detect_types=sqlite3.PARSE_DECLTYPES
+            )
             self.connection.row_factory = aiosqlite.Row
 
             await self.connection.execute("PRAGMA journal_mode=WAL")
