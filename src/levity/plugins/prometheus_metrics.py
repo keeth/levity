@@ -189,7 +189,10 @@ class PrometheusMetricsPlugin(ChargePointPlugin):
         self.ocpp_central_up.set(1)
         # Track message start times for histogram
         self._message_start_times = {}
-        # Track previous energy readings to detect jumps: {(cp_id, connector_id): last_reading}
+        # Track previous energy readings per transaction to detect jumps
+        # Key: (cp_id, transaction_id), Value: last_reading
+        # Only compare readings within the same transaction to avoid false positives
+        # when meter resets between transactions
         self._previous_energy_readings = {}
 
     def hooks(self) -> dict[PluginHook, str]:
@@ -367,6 +370,10 @@ class PrometheusMetricsPlugin(ChargePointPlugin):
         transaction_id = context.message_data.get("transaction_id")
         meter_stop = context.message_data.get("meter_stop")
 
+        # Clean up energy reading tracking for this transaction
+        reading_key = (cp_id, transaction_id)
+        self._previous_energy_readings.pop(reading_key, None)
+
         # Look up transaction to get connector_id and meter_start
         try:
             tx = await context.charge_point.tx_repo.get_by_id(transaction_id)
@@ -430,20 +437,23 @@ class PrometheusMetricsPlugin(ChargePointPlugin):
                 # Track energy (Wh)
                 if measurand == "Energy.Active.Import.Register":
                     # Detect large jumps in energy readings (charger bugs)
-                    # Track per charge point (each charger has one connector)
-                    if cp_id in self._previous_energy_readings:
-                        previous_reading = self._previous_energy_readings[cp_id]
-                        jump_size = abs(numeric_value - previous_reading)
-                        # Detect jumps > 10,000 Wh (10 kWh)
-                        if jump_size > 10000:
-                            self.ocpp_energy_jump_total.labels(cp_id=cp_id).inc()
-                            self.logger.warning(
-                                f"Large energy jump detected: {cp_id} "
-                                f"jumped from {previous_reading} to {numeric_value} Wh "
-                                f"(delta: {jump_size} Wh)"
-                            )
-                    # Update previous reading
-                    self._previous_energy_readings[cp_id] = numeric_value
+                    # Only compare readings within the SAME transaction to avoid
+                    # false positives when meter resets between transactions
+                    if transaction_id is not None:
+                        reading_key = (cp_id, transaction_id)
+                        if reading_key in self._previous_energy_readings:
+                            previous_reading = self._previous_energy_readings[reading_key]
+                            jump_size = abs(numeric_value - previous_reading)
+                            # Detect jumps > 10,000 Wh (10 kWh)
+                            if jump_size > 10000:
+                                self.ocpp_energy_jump_total.labels(cp_id=cp_id).inc()
+                                self.logger.warning(
+                                    f"Large energy jump detected: {cp_id} tx={transaction_id} "
+                                    f"jumped from {previous_reading} to {numeric_value} Wh "
+                                    f"(delta: {jump_size} Wh)"
+                                )
+                        # Update previous reading for this transaction
+                        self._previous_energy_readings[reading_key] = numeric_value
 
                     # This is the current meter reading
                     # To get energy for THIS transaction, need meter_start

@@ -25,7 +25,7 @@ from levity.plugins import (
 from levity.server import OCPPServer
 
 
-def setup_logging(level: str = "INFO"):
+def setup_logging(level: str = "INFO", ocpp_log_level: str = "WARNING"):
     """Configure JSON logging for the application."""
     json_formatter = JSONFormatter()
 
@@ -44,7 +44,7 @@ def setup_logging(level: str = "INFO"):
     # Suppress verbose logging from dependencies
     logging.getLogger("websockets").setLevel(logging.WARNING)
     logging.getLogger("aiohttp").setLevel(logging.WARNING)
-    logging.getLogger("ocpp").setLevel(logging.WARNING)
+    logging.getLogger("ocpp").setLevel(getattr(logging, ocpp_log_level.upper()))
 
 
 async def main():
@@ -71,6 +71,12 @@ async def main():
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         help="Logging level (default: INFO)",
+    )
+    parser.add_argument(
+        "--ocpp-log-level",
+        default="WARNING",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help="Logging level for OCPP library (default: WARNING)",
     )
     parser.add_argument(
         "--metrics-port",
@@ -139,7 +145,7 @@ async def main():
             parser.error(f"Invalid port in --fluentd-endpoint: {args.fluentd_endpoint}")
 
     # Setup logging
-    setup_logging(args.log_level)
+    setup_logging(args.log_level, args.ocpp_log_level)
     logger = logging.getLogger(__name__)
 
     # Log startup as structured event
