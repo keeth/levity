@@ -82,7 +82,7 @@ def log_ocpp_message(
         if value is not None:
             event_data[key] = value
 
-    logger.info(f"OCPP[{cp_id}] {dir_short.upper()} {action or message_type}", extra={"event_data": event_data})
+    logger.info(f"OCPP[{cp_id}] {dir_short.upper()} {action or message_type} {message_id or '-'}", extra={"event_data": event_data})
 
 
 def log_websocket_event(
