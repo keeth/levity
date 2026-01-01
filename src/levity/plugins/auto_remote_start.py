@@ -34,7 +34,7 @@ class AutoRemoteStartPlugin(ChargePointPlugin):
         self.delay_seconds = delay_seconds
 
     def hooks(self) -> dict[PluginHook, str]:
-        """Register hook to monitor status notifications."""
+        """Register hook to monitor status notifications (after response is sent)."""
         return {
             PluginHook.AFTER_STATUS_NOTIFICATION: "on_status_change",
         }
@@ -42,6 +42,10 @@ class AutoRemoteStartPlugin(ChargePointPlugin):
     async def on_status_change(self, context: PluginContext):
         """
         Handle status notification changes.
+
+        This hook runs AFTER the StatusNotification response has been sent to the
+        charge point, allowing us to safely send commands back without blocking
+        the response.
 
         If a connector enters Preparing state, trigger remote start after delay.
         """

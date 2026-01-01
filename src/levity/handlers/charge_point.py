@@ -263,8 +263,8 @@ class LevityChargePoint(BaseChargePoint):
             status=RegistrationStatus.accepted,
         )
 
-        # Execute AFTER hooks
-        await self._execute_plugin_hooks(PluginHook.AFTER_BOOT_NOTIFICATION, message_data, result)
+        # Execute ON hooks (before response is sent)
+        await self._execute_plugin_hooks(PluginHook.ON_BOOT_NOTIFICATION, message_data, result)
 
         return result
 
@@ -289,8 +289,8 @@ class LevityChargePoint(BaseChargePoint):
 
         result = call_result.Heartbeat(current_time=datetime.now(UTC).isoformat())
 
-        # Execute AFTER hooks
-        await self._execute_plugin_hooks(PluginHook.AFTER_HEARTBEAT, message_data, result)
+        # Execute ON hooks (before response is sent)
+        await self._execute_plugin_hooks(PluginHook.ON_HEARTBEAT, message_data, result)
 
         return result
 
@@ -334,8 +334,8 @@ class LevityChargePoint(BaseChargePoint):
 
         result = call_result.StatusNotification()
 
-        # Execute AFTER hooks
-        await self._execute_plugin_hooks(PluginHook.AFTER_STATUS_NOTIFICATION, message_data, result)
+        # Execute ON hooks (before response is sent)
+        await self._execute_plugin_hooks(PluginHook.ON_STATUS_NOTIFICATION, message_data, result)
 
         return result
 
@@ -402,8 +402,8 @@ class LevityChargePoint(BaseChargePoint):
             transaction_id=tx.id, id_tag_info={"status": "Accepted"}
         )
 
-        # Execute AFTER hooks
-        await self._execute_plugin_hooks(PluginHook.AFTER_START_TRANSACTION, message_data, result)
+        # Execute ON hooks (before response is sent)
+        await self._execute_plugin_hooks(PluginHook.ON_START_TRANSACTION, message_data, result)
 
         return result
 
@@ -454,8 +454,8 @@ class LevityChargePoint(BaseChargePoint):
 
         result = call_result.StopTransaction(id_tag_info={"status": "Accepted"})
 
-        # Execute AFTER hooks
-        await self._execute_plugin_hooks(PluginHook.AFTER_STOP_TRANSACTION, message_data, result)
+        # Execute ON hooks (before response is sent)
+        await self._execute_plugin_hooks(PluginHook.ON_STOP_TRANSACTION, message_data, result)
 
         return result
 
@@ -483,8 +483,8 @@ class LevityChargePoint(BaseChargePoint):
 
         result = call_result.MeterValues()
 
-        # Execute AFTER hooks
-        await self._execute_plugin_hooks(PluginHook.AFTER_METER_VALUES, message_data, result)
+        # Execute ON hooks (before response is sent)
+        await self._execute_plugin_hooks(PluginHook.ON_METER_VALUES, message_data, result)
 
         return result
 
@@ -546,8 +546,8 @@ class LevityChargePoint(BaseChargePoint):
         # For now, accept all authorizations
         result = call_result.Authorize(id_tag_info={"status": "Accepted"})
 
-        # Execute AFTER hooks
-        await self._execute_plugin_hooks(PluginHook.AFTER_AUTHORIZE, message_data, result)
+        # Execute ON hooks (before response is sent)
+        await self._execute_plugin_hooks(PluginHook.ON_AUTHORIZE, message_data, result)
 
         return result
 
@@ -555,7 +555,79 @@ class LevityChargePoint(BaseChargePoint):
     async def after_boot_notification(
         self, charge_point_vendor: str, charge_point_model: str, **kwargs
     ):
-        """Post-processing after BootNotification."""
+        """Execute AFTER hooks after BootNotification response is sent."""
+        message_data = {
+            "charge_point_vendor": charge_point_vendor,
+            "charge_point_model": charge_point_model,
+            **kwargs,
+        }
+        await self._execute_plugin_hooks(PluginHook.AFTER_BOOT_NOTIFICATION, message_data)
+
+    @after(Action.heartbeat)
+    async def after_heartbeat(self):
+        """Execute AFTER hooks after Heartbeat response is sent."""
+        message_data = {}
+        await self._execute_plugin_hooks(PluginHook.AFTER_HEARTBEAT, message_data)
+
+    @after(Action.status_notification)
+    async def after_status_notification(
+        self, connector_id: int, error_code: str, status: str, **kwargs
+    ):
+        """Execute AFTER hooks after StatusNotification response is sent."""
+        message_data = {
+            "connector_id": connector_id,
+            "error_code": error_code,
+            "status": status,
+            **kwargs,
+        }
+        await self._execute_plugin_hooks(PluginHook.AFTER_STATUS_NOTIFICATION, message_data)
+
+    @after(Action.start_transaction)
+    async def after_start_transaction(
+        self, connector_id: int, id_tag: str, meter_start: int, timestamp: str, **kwargs
+    ):
+        """Execute AFTER hooks after StartTransaction response is sent."""
+        message_data = {
+            "connector_id": connector_id,
+            "id_tag": id_tag,
+            "meter_start": meter_start,
+            "timestamp": timestamp,
+            **kwargs,
+        }
+        await self._execute_plugin_hooks(PluginHook.AFTER_START_TRANSACTION, message_data)
+
+    @after(Action.stop_transaction)
+    async def after_stop_transaction(
+        self,
+        meter_stop: int,
+        timestamp: str,
+        transaction_id: int,
+        **kwargs,
+    ):
+        """Execute AFTER hooks after StopTransaction response is sent."""
+        message_data = {
+            "meter_stop": meter_stop,
+            "timestamp": timestamp,
+            "transaction_id": transaction_id,
+            **kwargs,
+        }
+        await self._execute_plugin_hooks(PluginHook.AFTER_STOP_TRANSACTION, message_data)
+
+    @after(Action.meter_values)
+    async def after_meter_values(self, connector_id: int, meter_value: list, **kwargs):
+        """Execute AFTER hooks after MeterValues response is sent."""
+        message_data = {
+            "connector_id": connector_id,
+            "meter_value": meter_value,
+            **kwargs,
+        }
+        await self._execute_plugin_hooks(PluginHook.AFTER_METER_VALUES, message_data)
+
+    @after(Action.authorize)
+    async def after_authorize(self, id_tag: str):
+        """Execute AFTER hooks after Authorize response is sent."""
+        message_data = {"id_tag": id_tag}
+        await self._execute_plugin_hooks(PluginHook.AFTER_AUTHORIZE, message_data)
 
     async def start(self):
         """Start the charge point message handler and heartbeat watchdog."""

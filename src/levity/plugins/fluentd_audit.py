@@ -63,17 +63,17 @@ class FluentdAuditPlugin(ChargePointPlugin):
         """Register hooks for all OCPP message types."""
         return {
             # Boot and connection
-            PluginHook.AFTER_BOOT_NOTIFICATION: "log_boot_notification",
-            PluginHook.AFTER_HEARTBEAT: "log_heartbeat",
+            PluginHook.ON_BOOT_NOTIFICATION: "log_boot_notification",
+            PluginHook.ON_HEARTBEAT: "log_heartbeat",
             # Status updates
-            PluginHook.AFTER_STATUS_NOTIFICATION: "log_status_notification",
+            PluginHook.ON_STATUS_NOTIFICATION: "log_status_notification",
             # Transactions
-            PluginHook.AFTER_START_TRANSACTION: "log_start_transaction",
-            PluginHook.AFTER_STOP_TRANSACTION: "log_stop_transaction",
+            PluginHook.ON_START_TRANSACTION: "log_start_transaction",
+            PluginHook.ON_STOP_TRANSACTION: "log_stop_transaction",
             # Meter values
-            PluginHook.AFTER_METER_VALUES: "log_meter_values",
+            PluginHook.ON_METER_VALUES: "log_meter_values",
             # Authorization
-            PluginHook.AFTER_AUTHORIZE: "log_authorize",
+            PluginHook.ON_AUTHORIZE: "log_authorize",
         }
 
     async def initialize(self, charge_point):

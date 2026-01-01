@@ -200,24 +200,24 @@ class PrometheusMetricsPlugin(ChargePointPlugin):
         return {
             # Connection lifecycle
             PluginHook.BEFORE_BOOT_NOTIFICATION: "before_message",
-            PluginHook.AFTER_BOOT_NOTIFICATION: "after_boot_notification",
+            PluginHook.ON_BOOT_NOTIFICATION: "on_boot_notification",
             # Heartbeat
             PluginHook.BEFORE_HEARTBEAT: "before_message",
-            PluginHook.AFTER_HEARTBEAT: "after_heartbeat",
+            PluginHook.ON_HEARTBEAT: "on_heartbeat",
             # Status
             PluginHook.BEFORE_STATUS_NOTIFICATION: "before_message",
-            PluginHook.AFTER_STATUS_NOTIFICATION: "after_status_notification",
+            PluginHook.ON_STATUS_NOTIFICATION: "on_status_notification",
             # Transactions
             PluginHook.BEFORE_START_TRANSACTION: "before_message",
-            PluginHook.AFTER_START_TRANSACTION: "after_start_transaction",
+            PluginHook.ON_START_TRANSACTION: "on_start_transaction",
             PluginHook.BEFORE_STOP_TRANSACTION: "before_message",
-            PluginHook.AFTER_STOP_TRANSACTION: "after_stop_transaction",
+            PluginHook.ON_STOP_TRANSACTION: "on_stop_transaction",
             # Meter values
             PluginHook.BEFORE_METER_VALUES: "before_message",
-            PluginHook.AFTER_METER_VALUES: "after_meter_values",
+            PluginHook.ON_METER_VALUES: "on_meter_values",
             # Authorization
             PluginHook.BEFORE_AUTHORIZE: "before_message",
-            PluginHook.AFTER_AUTHORIZE: "after_message",
+            PluginHook.ON_AUTHORIZE: "on_message",
         }
 
     async def initialize(self, charge_point):
@@ -291,7 +291,7 @@ class PrometheusMetricsPlugin(ChargePointPlugin):
         # Update last message timestamp on any message
         self.ocpp_cp_last_msg_ts.labels(cp_id=cp_id).set(time.time())
 
-    async def after_message(self, context: PluginContext):
+    async def on_message(self, context: PluginContext):
         """Record message handling duration."""
         cp_id = context.charge_point.id
         message_type = self._get_message_type(context)
@@ -304,10 +304,10 @@ class PrometheusMetricsPlugin(ChargePointPlugin):
                 message_type=message_type,
             ).observe(duration)
 
-    async def after_boot_notification(self, context: PluginContext):
-        """Track boot notifications."""
+    async def on_boot_notification(self, context: PluginContext):
+        """Track boot notifications and reset transaction metrics."""
         cp_id = context.charge_point.id
-        await self.after_message(context)
+        await self.on_message(context)
         self.ocpp_cp_boots_total.labels(cp_id=cp_id).inc()
 
         # Check if there were orphaned transactions when booting
@@ -315,19 +315,38 @@ class PrometheusMetricsPlugin(ChargePointPlugin):
         active_txs = await context.charge_point.tx_repo.get_all_active_for_cp(cp_id)
         if active_txs:
             # Increment counter for each orphaned transaction found at boot
-            for _ in active_txs:
+            for tx in active_txs:
                 self.ocpp_cp_reconnect_during_tx_total.labels(cp_id=cp_id).inc()
 
-    async def after_heartbeat(self, context: PluginContext):
+                # Clean up energy reading tracking for orphaned transaction
+                reading_key = (cp_id, tx.id)
+                self._previous_energy_readings.pop(reading_key, None)
+
+        # Reset transaction-related metrics for all connectors on this charge point
+        # Boot means any active transaction is now terminated
+        try:
+            connectors = await context.charge_point.conn_repo.get_all_for_cp(cp_id)
+            for connector in connectors:
+                conn_id = str(connector.conn_id)
+                # Mark transaction as inactive
+                self.ocpp_tx_active.labels(cp_id=cp_id, connector_id=conn_id).set(0)
+                # Reset energy gauge
+                self.ocpp_tx_energy_wh.labels(cp_id=cp_id, connector_id=conn_id).set(0)
+                # Reset current to 0 (charger rebooted, not charging)
+                self.ocpp_cp_current_a.labels(cp_id=cp_id, connector_id=conn_id).set(0)
+        except Exception as e:
+            self.logger.error(f"Error resetting metrics on boot for {cp_id}: {e}")
+
+    async def on_heartbeat(self, context: PluginContext):
         """Track heartbeat timestamp."""
         cp_id = context.charge_point.id
-        await self.after_message(context)
+        await self.on_message(context)
         self.ocpp_cp_last_heartbeat_ts.labels(cp_id=cp_id).set(time.time())
 
-    async def after_status_notification(self, context: PluginContext):
+    async def on_status_notification(self, context: PluginContext):
         """Track charge point status changes."""
         cp_id = context.charge_point.id
-        await self.after_message(context)
+        await self.on_message(context)
 
         connector_id = context.message_data.get("connector_id")
         status = context.message_data.get("status")
@@ -345,10 +364,10 @@ class PrometheusMetricsPlugin(ChargePointPlugin):
                 error_type=error_code,
             ).inc()
 
-    async def after_start_transaction(self, context: PluginContext):
+    async def on_start_transaction(self, context: PluginContext):
         """Track transaction start."""
         cp_id = context.charge_point.id
-        await self.after_message(context)
+        await self.on_message(context)
 
         connector_id = context.message_data.get("connector_id")
         context.message_data.get("meter_start", 0)
@@ -362,10 +381,10 @@ class PrometheusMetricsPlugin(ChargePointPlugin):
         # Increment total transaction counter
         self.ocpp_tx_total.labels(cp_id=cp_id).inc()
 
-    async def after_stop_transaction(self, context: PluginContext):
+    async def on_stop_transaction(self, context: PluginContext):
         """Track transaction stop and cumulative energy."""
         cp_id = context.charge_point.id
-        await self.after_message(context)
+        await self.on_message(context)
 
         transaction_id = context.message_data.get("transaction_id")
         meter_stop = context.message_data.get("meter_stop")
@@ -396,6 +415,12 @@ class PrometheusMetricsPlugin(ChargePointPlugin):
                         connector_id=str(ocpp_conn_id),
                     ).set(0)
 
+                    # Reset current to 0 (transaction ended, no longer charging)
+                    self.ocpp_cp_current_a.labels(
+                        cp_id=cp_id,
+                        connector_id=str(ocpp_conn_id),
+                    ).set(0)
+
                     # Add to cumulative energy if we have meter values
                     if tx.meter_start is not None and meter_stop is not None:
                         energy_wh = meter_stop - tx.meter_start
@@ -407,10 +432,10 @@ class PrometheusMetricsPlugin(ChargePointPlugin):
         # Update last transaction timestamp
         self.ocpp_cp_last_tx_ts.labels(cp_id=cp_id).set(time.time())
 
-    async def after_meter_values(self, context: PluginContext):
+    async def on_meter_values(self, context: PluginContext):
         """Track meter values (energy and current)."""
         cp_id = context.charge_point.id
-        await self.after_message(context)
+        await self.on_message(context)
 
         connector_id = context.message_data.get("connector_id")
         transaction_id = context.message_data.get("transaction_id")

@@ -38,7 +38,7 @@ class TestPluginFramework:
 
         class TestPlugin(ChargePointPlugin):
             def hooks(self):
-                return {PluginHook.AFTER_BOOT_NOTIFICATION: "on_boot"}
+                return {PluginHook.ON_BOOT_NOTIFICATION: "on_boot"}
 
             async def on_boot(self, context: PluginContext):
                 pass
@@ -54,7 +54,7 @@ class TestPluginFramework:
         # Verify plugin was registered
         assert len(cp.plugins) == 1
         assert cp.plugins[0] == plugin
-        assert PluginHook.AFTER_BOOT_NOTIFICATION in cp._plugin_hooks
+        assert PluginHook.ON_BOOT_NOTIFICATION in cp._plugin_hooks
 
     @pytest.mark.asyncio
     async def test_plugin_hook_execution(self, db_connection):
@@ -65,14 +65,14 @@ class TestPluginFramework:
             def hooks(self):
                 return {
                     PluginHook.BEFORE_BOOT_NOTIFICATION: "before_boot",
-                    PluginHook.AFTER_BOOT_NOTIFICATION: "after_boot",
+                    PluginHook.ON_BOOT_NOTIFICATION: "on_boot",
                 }
 
             async def before_boot(self, context: PluginContext):
                 called.append("before")
 
-            async def after_boot(self, context: PluginContext):
-                called.append("after")
+            async def on_boot(self, context: PluginContext):
+                called.append("on")
                 assert context.result is not None
 
         plugin = TestPlugin()
@@ -84,7 +84,7 @@ class TestPluginFramework:
         result = await cp.on_boot_notification("TestVendor", "TestModel")
 
         # Verify hooks were called in order
-        assert called == ["before", "after"]
+        assert called == ["before", "on"]
         assert result.status == "Accepted"
 
     @pytest.mark.asyncio
@@ -123,10 +123,20 @@ class TestAutoRemoteStartPlugin:
         cp.call = mock_call
 
         # Send status notification for connector entering Preparing state
+        # The ON hook runs during the @on handler
         await cp.on_status_notification(
             connector_id=1,
             error_code="NoError",
             status=ChargePointStatus.preparing,
+        )
+
+        # The AFTER hook runs after the response is sent (via @after decorator)
+        # In production this is called by the ocpp library routing, but in tests
+        # we need to call it explicitly
+        await cp.after_status_notification(
+            connector_id=1,
+            error_code="NoError",
+            status=ChargePointStatus.preparing.value,
         )
 
         # Wait for the delay + a bit extra
@@ -155,6 +165,13 @@ class TestAutoRemoteStartPlugin:
             status=ChargePointStatus.available,
         )
 
+        # Trigger the AFTER hook (as the ocpp library routing would)
+        await cp.after_status_notification(
+            connector_id=1,
+            error_code="NoError",
+            status=ChargePointStatus.available.value,
+        )
+
         # Wait for potential delay
         await asyncio.sleep(0.2)
 
@@ -177,6 +194,13 @@ class TestAutoRemoteStartPlugin:
             connector_id=0,
             error_code="NoError",
             status=ChargePointStatus.preparing,
+        )
+
+        # Trigger the AFTER hook (as the ocpp library routing would)
+        await cp.after_status_notification(
+            connector_id=0,
+            error_code="NoError",
+            status=ChargePointStatus.preparing.value,
         )
 
         # Wait for potential delay

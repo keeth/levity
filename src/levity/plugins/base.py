@@ -18,33 +18,45 @@ class PluginHook(str, Enum):
 
     Hooks are called at specific points during message processing:
     - BEFORE_*: Called before the standard handler processes the message
-    - AFTER_*: Called after the standard handler completes successfully
+    - ON_*: Called inside the @on handler, after processing but before response is sent
+    - AFTER_*: Called after the response has been sent to the charge point (via @after)
+
+    Use ON_* hooks for logging, metrics, and response-dependent logic.
+    Use AFTER_* hooks for side effects that should happen after the response is sent
+    (e.g., sending commands back to the charge point).
     """
 
     # Boot notification hooks
     BEFORE_BOOT_NOTIFICATION = "before_boot_notification"
+    ON_BOOT_NOTIFICATION = "on_boot_notification"
     AFTER_BOOT_NOTIFICATION = "after_boot_notification"
 
     # Status notification hooks
     BEFORE_STATUS_NOTIFICATION = "before_status_notification"
+    ON_STATUS_NOTIFICATION = "on_status_notification"
     AFTER_STATUS_NOTIFICATION = "after_status_notification"
 
     # Transaction hooks
     BEFORE_START_TRANSACTION = "before_start_transaction"
+    ON_START_TRANSACTION = "on_start_transaction"
     AFTER_START_TRANSACTION = "after_start_transaction"
     BEFORE_STOP_TRANSACTION = "before_stop_transaction"
+    ON_STOP_TRANSACTION = "on_stop_transaction"
     AFTER_STOP_TRANSACTION = "after_stop_transaction"
 
     # Heartbeat hooks
     BEFORE_HEARTBEAT = "before_heartbeat"
+    ON_HEARTBEAT = "on_heartbeat"
     AFTER_HEARTBEAT = "after_heartbeat"
 
     # Meter values hooks
     BEFORE_METER_VALUES = "before_meter_values"
+    ON_METER_VALUES = "on_meter_values"
     AFTER_METER_VALUES = "after_meter_values"
 
     # Authorization hooks
     BEFORE_AUTHORIZE = "before_authorize"
+    ON_AUTHORIZE = "on_authorize"
     AFTER_AUTHORIZE = "after_authorize"
 
 
