@@ -94,13 +94,14 @@ plugin = FluentdAuditPlugin(
 **Example Event**:
 ```json
 {
-  "event_type": "transaction_start",
-  "charge_point_id": "CP001",
-  "timestamp": "2024-01-15T10:30:00Z",
-  "connector_id": 1,
-  "id_tag": "USER-123",
-  "meter_start": 1000,
-  "transaction_id": 42
+  "type": "ocpp",
+  "cp": "CP001",
+  "dir": "recv",
+  "msg": {
+    "connector_id": 1,
+    "id_tag": "USER-123",
+    "meter_start": 1000
+  }
 }
 ```
 
@@ -130,10 +131,10 @@ plugin = FluentdWebSocketAuditPlugin(
 **Example Events**:
 ```json
 {
-  "event_type": "websocket_connect",
-  "charge_point_id": "CP001",
-  "timestamp": "2024-01-15T10:00:00Z",
-  "remote_address": "192.168.1.100:54321"
+  "type": "ws",
+  "cp": "CP001",
+  "event": "connect",
+  "remote_addr": "192.168.1.100:54321"
 }
 ```
 

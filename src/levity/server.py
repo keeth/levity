@@ -15,7 +15,7 @@ from .logging_utils import log_error, log_websocket_event
 from .plugins.base import ChargePointPlugin
 from .plugins.prometheus_metrics import PrometheusMetricsPlugin
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("levity")
 
 
 class OCPPServer:

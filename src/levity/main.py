@@ -152,8 +152,9 @@ async def main():
     logger.info(
         "System starting",
         extra={
-            "event_type": "system_startup",
             "event_data": {
+                "type": "system",
+                "event": "startup",
                 "database": args.db,
                 "websocket_endpoint": f"ws://{args.host}:{args.port}/ws/{{cp_id}}",
                 "metrics_endpoint": f"http://{args.host}:{args.metrics_port}/metrics"
@@ -231,7 +232,7 @@ async def main():
     except KeyboardInterrupt:
         logger.info(
             "System shutting down",
-            extra={"event_type": "system_shutdown", "event_data": {"reason": "SIGINT"}},
+            extra={"event_data": {"type": "system", "event": "shutdown", "reason": "SIGINT"}},
         )
     except Exception as e:
         log_error(logger, "server_error", f"Server error: {e}", exc_info=e)

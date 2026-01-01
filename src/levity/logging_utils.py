@@ -19,8 +19,6 @@ class JSONFormatter(logging.Formatter):
         }
 
         # Add event-specific fields if present
-        if hasattr(record, "event_type"):
-            log_data["event_type"] = record.event_type
         if hasattr(record, "event_data"):
             log_data.update(record.event_data)
 
@@ -84,12 +82,7 @@ def log_ocpp_message(
         if value is not None:
             event_data[key] = value
 
-    extra = {
-        "event_type": "ocpp_message",
-        "event_data": event_data,
-    }
-
-    logger.info(f"OCPP {dir_short}: {action or message_type}", extra=extra)
+    logger.info(f"OCPP[{cp_id}] {dir_short.upper()} {action or message_type}", extra={"event_data": event_data})
 
 
 def log_websocket_event(
@@ -122,11 +115,7 @@ def log_websocket_event(
         if value is not None:
             event_data[key] = value
 
-    extra = {
-        "event_type": "websocket_event",
-        "event_data": event_data,
-    }
-    logger.info(f"WebSocket {event}", extra=extra)
+    logger.info(f"WS[{cp_id}] {event.upper()}", extra={"event_data": event_data})
 
 
 def log_error(
@@ -163,8 +152,4 @@ def log_error(
         if value is not None:
             event_data[key] = value
 
-    extra = {
-        "event_type": "error",
-        "event_data": event_data,
-    }
-    logger.error(message, extra=extra, exc_info=exc_info)
+    logger.error(message, extra={"event_data": event_data}, exc_info=exc_info)

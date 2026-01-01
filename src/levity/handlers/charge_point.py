@@ -27,7 +27,7 @@ from ..repositories import (
     TransactionRepository,
 )
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("levity")
 
 
 class LevityChargePoint(BaseChargePoint):
@@ -659,8 +659,8 @@ class LevityChargePoint(BaseChargePoint):
                         f"Charge point {self.id} heartbeat timeout "
                         f"(last heartbeat {elapsed:.0f}s ago, timeout {self.heartbeat_timeout}s)",
                         extra={
-                            "event_type": "heartbeat_timeout",
                             "event_data": {
+                                "type": "heartbeat_timeout",
                                 "cp_id": self.id,
                                 "elapsed_seconds": elapsed,
                                 "timeout_seconds": self.heartbeat_timeout,
