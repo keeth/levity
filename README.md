@@ -14,7 +14,7 @@ I run Levity onsite on a Raspberry Pi with attached SSD storage. It sends metric
 
 - [Grafana](https://grafana.com/): alerts and monitoring (not just the service itself but the status of each charger, total energy use, active charging sessions, network disconnections, etc)
 
-- [Fluentd](https://www.fluentd.org/): complete bidirectional logging of OCPP traffic for audit/debug purposes
+- [Fluentd](https://www.fluentd.org/): complete bidirectional network logging of OCPP traffic for audit/debug purposes
 
 - [Litestream](https://litestream.io/): replicate the SQLite database to S3 for durability and data exploration
 
