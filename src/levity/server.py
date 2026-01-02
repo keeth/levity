@@ -1,6 +1,7 @@
 """WebSocket server for OCPP central system."""
 
 import asyncio
+import contextlib
 import logging
 from collections.abc import Callable
 
@@ -100,6 +101,22 @@ class OCPPServer:
                 logger, "connect", cp_id=charge_point_id, remote_address=remote_address
             )
 
+            # Check for existing connection and close it (handles reconnects)
+            existing_cp = self.charge_points.get(charge_point_id)
+            if existing_cp:
+                old_addr = existing_cp.remote_address
+                log_websocket_event(
+                    logger,
+                    "duplicate_connection",
+                    cp_id=charge_point_id,
+                    remote_address=remote_address,
+                    old_remote_address=old_addr,
+                )
+                with contextlib.suppress(Exception):
+                    await existing_cp._connection.close(1000, "Replaced by new connection")
+                # Don't delete from dict here - let the old handler's finally block handle it
+                # (but it won't clobber us because of the identity check below)
+
             # Get database connection
             db_conn = await self.db.connect()
 
@@ -181,7 +198,9 @@ class OCPPServer:
                         cp_id=charge_point_id,
                         exc_info=e,
                     )
-            if charge_point_id and charge_point_id in self.charge_points:
+            # Only remove from dict if THIS connection is still the registered one
+            # (prevents old connection cleanup from clobbering a newer connection)
+            if charge_point_id and self.charge_points.get(charge_point_id) is charge_point:
                 del self.charge_points[charge_point_id]
             if charge_point_id:
                 log_websocket_event(
