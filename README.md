@@ -51,7 +51,7 @@ levity --port 9000 --metrics-port 9090
 --port              WebSocket port (default: 9000)
 --db                SQLite database path (default: levity.db)
 --metrics-port      Prometheus metrics port (enables metrics)
---enable-auto-start Enable auto remote start on cable plug-in
+--enable-auto-start When a vehicle is plugged in, start charging immediately
 --fluentd-endpoint  Fluentd endpoint (host:port) for audit logging
 --log-level         DEBUG, INFO, WARNING, ERROR (default: INFO)
 ```
