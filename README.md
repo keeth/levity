@@ -1,22 +1,22 @@
 # Levity
 
-OCPP 1.6 Central System with SQLite storage, built with Python's [`ocpp`](https://github.com/mobilityhouse/ocpp) library.
+Levity is a barebones, no-GUI, [SQLite](https://www.sqlite.org/)-backed, single-threaded, async OCPP server. Complementary tools like [Prometheus](https://prometheus.io/), [Grafana](https://grafana.com/), [Fluentd](https://www.fluentd.org/), and [Litestream](https://litestream.io/) make it something like a complete package.
 
 ## Why this exists
 
-I needed a program to manage a fleet of 20 EV chargers ([Grizzl-e Smart](https://grizzl-e.com/)) in a cohousing development, primarily to track energy use for billing purposes, but with solid observability so that I could respond quickly to any problems.
+I needed a program to manage a fleet of 20 EV chargers ([Grizzl-e Smart](https://grizzl-e.com/)) at my cohousing development, to track energy use and give observability into the charger network.
 
 My [v1](https://github.com/keeth/levity/tree/v1) was overengineered (Django, Postgres, Docker, RabbitMQ, nginx, etc) and over time I realized that I would be better served by something smaller and simpler, with a strong focus on reliability and low resource usage.
 
-Levity is a barebones, no-GUI, [SQLite](https://www.sqlite.org/)-backed, single-threaded OCPP server. But complementary tools like [Prometheus](https://prometheus.io/), [Grafana](https://grafana.com/), [Fluentd](https://www.fluentd.org/), and [Litestream](https://litestream.io/) make it something more like a complete package.
-
-I run Levity onsite on a Raspberry Pi with attached SSD storage. It sends metrics and audit logs up to a cloud instance ([Hetzner](https://www.hetzner.com/) / [Coolify](https://coolify.io/)) running the above tools.
+I run Levity onsite on a Raspberry Pi with attached SSD storage. It sends metrics and audit logs up to a cloud instance ([Hetzner](https://www.hetzner.com/) / [Coolify](https://coolify.io/)).
 
 - [Grafana](https://grafana.com/): alerts and monitoring (not just the service itself but the status of each charger, total energy use, active charging sessions, network disconnections, etc)
 
 - [Fluentd](https://www.fluentd.org/): complete bidirectional network logging of OCPP traffic for audit/debug purposes
 
 - [Litestream](https://litestream.io/): replicate the SQLite database to S3 for durability and data exploration
+
+- 
 
 ## Status of the project
 
