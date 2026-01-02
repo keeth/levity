@@ -136,7 +136,9 @@ async def main():
     if args.fluentd_endpoint:
         try:
             if ":" not in args.fluentd_endpoint:
-                parser.error("--fluentd-endpoint must be in host:port format (e.g., localhost:24224)")
+                parser.error(
+                    "--fluentd-endpoint must be in host:port format (e.g., localhost:24224)"
+                )
             fluentd_host, port_str = args.fluentd_endpoint.rsplit(":", 1)
             fluentd_port = int(port_str)
             if not fluentd_host:

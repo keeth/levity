@@ -2,7 +2,7 @@
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 
@@ -12,7 +12,7 @@ class JSONFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         """Format log record as JSON."""
         log_data = {
-            "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
+            "timestamp": datetime.fromtimestamp(record.created, tz=UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
@@ -82,7 +82,10 @@ def log_ocpp_message(
         if value is not None:
             event_data[key] = value
 
-    logger.info(f"OCPP[{cp_id}] {dir_short.upper()} {action or message_type} {message_id or '-'}", extra={"event_data": event_data})
+    logger.info(
+        f"OCPP[{cp_id}] {dir_short.upper()} {action or message_type} {message_id or '-'}",
+        extra={"event_data": event_data},
+    )
 
 
 def log_websocket_event(

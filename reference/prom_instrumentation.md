@@ -10,7 +10,7 @@ Expose Prometheus metrics on `/metrics`
 
 **Histogram**
 
-- `ocpp_msg_handling_seconds`  
+- `ocpp_msg_handling_seconds`
   Wrap each OCPP message handler.
 
 ---
@@ -19,15 +19,15 @@ Expose Prometheus metrics on `/metrics`
 
 **Gauges**
 
-- `ocpp_cp_connected{cp_id}`  
+- `ocpp_cp_connected{cp_id}`
   `1` if WebSocket open, else `0`
-- `ocpp_cp_last_heartbeat_ts{cp_id}`  
+- `ocpp_cp_last_heartbeat_ts{cp_id}`
   Unix timestamp
-- `ocpp_cp_last_msg_ts{cp_id}`  
+- `ocpp_cp_last_msg_ts{cp_id}`
   Unix timestamp
-- `ocpp_cp_last_tx_ts{cp_id}`  
+- `ocpp_cp_last_tx_ts{cp_id}`
   Unix timestamp
-- `ocpp_cp_status{cp_id}`  
+- `ocpp_cp_status{cp_id}`
   Numeric status code
 
 **Counters**
@@ -70,13 +70,13 @@ Update on error and on BootNotification.
 
 **Gauges**
 
-- `ocpp_tx_active{cp_id, connector_id}`  
+- `ocpp_tx_active{cp_id, connector_id}`
   `1` if a tx is active on this connector, else `0`
-- `ocpp_tx_energy_wh{cp_id, connector_id}`  
+- `ocpp_tx_energy_wh{cp_id, connector_id}`
   Energy delivered so far in the *current* tx (Wh)
-- `ocpp_cp_current_a{cp_id, connector_id}`  
+- `ocpp_cp_current_a{cp_id, connector_id}`
   Instantaneous measured current (A)
-- `ocpp_cp_current_limit_a{cp_id, connector_id}` (optional)  
+- `ocpp_cp_current_limit_a{cp_id, connector_id}` (optional)
   Configured current limit / setpoint (A)
 
 **Update points**
@@ -95,9 +95,9 @@ Update on error and on BootNotification.
 
 **Counters**
 
-- `ocpp_tx_total{cp_id}`  
+- `ocpp_tx_total{cp_id}`
   Total tx count per cp
-- `ocpp_cp_energy_total_wh{cp_id}`  
+- `ocpp_cp_energy_total_wh{cp_id}`
   Cumulative energy delivered by this cp (Wh)
 
 **Update points**
@@ -121,5 +121,5 @@ with ocpp_msg_handling_seconds.time():
 
 ---
 
-That’s the full, compact spec your code agent can implement:  
+That’s the full, compact spec your code agent can implement:
 **/metrics endpoint + gauges/counters for cp connection, status, errors, BootNotification, tx lifecycle, Wh as counters for totals, A as gauges for instantaneous current.**

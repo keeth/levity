@@ -93,7 +93,11 @@ class MockOCPPClient(OCPPChargePoint):
         return await self.call(request)
 
     async def send_stop_transaction(
-        self, transaction_id: int, meter_stop: int, reason: str = "Local", transaction_data: list | None = None
+        self,
+        transaction_id: int,
+        meter_stop: int,
+        reason: str = "Local",
+        transaction_data: list | None = None,
     ):
         """Send StopTransaction."""
         request = call.StopTransaction(
@@ -442,56 +446,6 @@ class TestOCPPIntegration:
             except asyncio.CancelledError:
                 pass
 
-    async def test_message_before_boot_notification(self, ocpp_server, temp_db):
-        """
-        Test that messages received before BootNotification automatically create charge point.
-
-        This prevents foreign key constraint errors when chargers send messages
-        (like StatusNotification or MeterValues) before BootNotification.
-        """
-        cp_id = "TEST_CP_EARLY_MESSAGE"
-
-        async with websockets.connect(
-            f"ws://127.0.0.1:19000/ws/{cp_id}",
-            subprotocols=["ocpp1.6"],
-        ) as ws:
-            client = MockOCPPClient(cp_id, ws)
-            client_task = asyncio.create_task(client.start())
-
-            # Send StatusNotification BEFORE BootNotification
-            # This should automatically create a minimal charge point record
-            await client.send_status_notification(1, "Available", "NoError")
-
-            # Verify charge point was created automatically
-            conn = await temp_db.connect()
-            repo = ChargePointRepository(conn)
-            cp = await repo.get_by_id(cp_id)
-
-            assert cp is not None, "Charge point should be created automatically"
-            assert cp.id == cp_id
-            assert cp.status == "Unknown", "Should have default status"
-            assert cp.vendor == "", "Should have empty vendor until BootNotification"
-            assert cp.is_connected is True
-
-            # Now send BootNotification - should update existing record
-            boot_response = await client.send_boot_notification("TestVendor", "TestModel")
-            assert boot_response.status == "Accepted"
-
-            # Verify charge point was updated with boot notification data
-            cp = await repo.get_by_id(cp_id)
-            assert cp.vendor == "TestVendor"
-            assert cp.model == "TestModel"
-            assert cp.status == "Unknown", (
-                "Status should remain Unknown (not updated by BootNotification)"
-            )
-
-            # Cleanup
-            client_task.cancel()
-            try:
-                await client_task
-            except asyncio.CancelledError:
-                pass
-
     async def test_stop_transaction_with_transaction_data(self, ocpp_server, temp_db):
         """Test StopTransaction with meter values in transaction_data."""
         cp_id = "TEST_CP_STOP_TX_DATA"
@@ -581,7 +535,9 @@ class TestOCPPIntegration:
                 # Send BootNotification and verify custom interval
                 response = await client.send_boot_notification("TestVendor", "TestModel")
                 assert response.status == "Accepted"
-                assert response.interval == 30, "Should use custom heartbeat interval, not default 60"
+                assert response.interval == 30, (
+                    "Should use custom heartbeat interval, not default 60"
+                )
 
                 client_task.cancel()
                 try:

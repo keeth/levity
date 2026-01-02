@@ -154,4 +154,3 @@ All metrics are prefixed with `ocpp_` (except for standard Prometheus process me
 - `ocpp_cp_reconnect_during_tx_total{cp_id}` - Reconnects during transactions
 
 For a complete list, see the Prometheus metrics plugin documentation.
-

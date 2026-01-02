@@ -5,7 +5,6 @@ from unittest.mock import MagicMock
 
 import pytest
 from ocpp.v16.enums import ChargePointStatus
-from prometheus_client import REGISTRY
 
 from levity.models import ChargePoint as ChargePointModel
 from levity.models import Connector, Transaction
@@ -47,7 +46,7 @@ class TestPrometheusMetricsPlugin:
     async def test_plugin_initialization(self, db_connection):
         """Test that metrics are initialized on plugin creation."""
         plugin = PrometheusMetricsPlugin()
-        cp = await create_test_charge_point("TEST001", db_connection, plugins=[plugin])
+        await create_test_charge_point("TEST001", db_connection, plugins=[plugin])
 
         # Verify connection metric
         value = get_metric_value(plugin.ocpp_cp_connected, {"cp_id": "TEST001"})
@@ -466,7 +465,9 @@ class TestPrometheusMetricsPlugin:
         cp = await create_test_charge_point("TEST_NO_FALSE_POS", db_connection, plugins=[plugin])
 
         # Create connector
-        connector = Connector(cp_id="TEST_NO_FALSE_POS", conn_id=1, status=ChargePointStatus.charging)
+        connector = Connector(
+            cp_id="TEST_NO_FALSE_POS", conn_id=1, status=ChargePointStatus.charging
+        )
         connector = await cp.conn_repo.upsert(connector)
 
         # First transaction with high meter reading
@@ -547,7 +548,7 @@ class TestPrometheusMetricsPlugin:
 
         # Create two charge points
         cp1 = await create_test_charge_point("CP001", db_connection, plugins=[plugin])
-        cp2 = await create_test_charge_point("CP002", db_connection, plugins=[plugin])
+        await create_test_charge_point("CP002", db_connection, plugins=[plugin])
 
         # Both should be connected
         value1 = get_metric_value(plugin.ocpp_cp_connected, {"cp_id": "CP001"})

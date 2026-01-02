@@ -237,16 +237,14 @@ class PrometheusMetricsPlugin(ChargePointPlugin):
                     self.ocpp_tx_active.labels(cp_id=cp_id, connector_id=conn_id).set(1)
 
                     # Restore energy if we have meter values
-                    last_meter = await charge_point.meter_repo.get_last_for_transaction(
-                        tx.id
-                    )
+                    last_meter = await charge_point.meter_repo.get_last_for_transaction(tx.id)
                     if last_meter and tx.meter_start is not None:
                         try:
                             current_reading = float(last_meter.value)
                             tx_energy = current_reading - tx.meter_start
-                            self.ocpp_tx_energy_wh.labels(
-                                cp_id=cp_id, connector_id=conn_id
-                            ).set(tx_energy)
+                            self.ocpp_tx_energy_wh.labels(cp_id=cp_id, connector_id=conn_id).set(
+                                tx_energy
+                            )
                         except (ValueError, TypeError):
                             pass
 

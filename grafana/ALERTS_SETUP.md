@@ -184,4 +184,3 @@ If labels like `cp_id` are missing:
 1. Verify charge points are connected and sending data
 2. Check that metrics are being scraped by Prometheus
 3. Verify metric labels in Prometheus: `curl http://localhost:9090/api/v1/query?query=ocpp_cp_connected`
-

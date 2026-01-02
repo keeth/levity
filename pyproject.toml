@@ -25,6 +25,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "pre-commit>=4.0.0",
     "pytest>=9.0.1",
     "pytest-asyncio>=1.3.0",
     "ruff>=0.14.5",
@@ -92,6 +93,12 @@ ignore = [
 "example_client.py" = ["T201"]
 # Test files can have longer functions and classes, imports anywhere, and use try-except-pass
 "tests/**/*.py" = ["PLR0915", "PLC0415", "SIM105"]
+# Allow complexity in main entry point (argument parsing is inherently verbose)
+"src/levity/main.py" = ["PLR0912", "PLR0915"]
+# Allow complexity in server connection handler (many branches for protocol handling)
+"src/levity/server.py" = ["PLR0912", "PLR0915"]
+# Allow complexity in metrics plugin (many metric types to handle)
+"src/levity/plugins/prometheus_metrics.py" = ["PLR0912"]
 
 [tool.ruff.format]
 # Use double quotes for strings
