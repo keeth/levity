@@ -6,9 +6,9 @@ OCPP 1.6 Central System with SQLite storage, built with Python's [`ocpp`](https:
 
 I needed a program to manage a fleet of 20 EV chargers ([Grizzl-e Smart](https://grizzl-e.com/)) in a cohousing development, primarily to track energy use for billing purposes, but with solid observability so that I could respond quickly to any problems.
 
-My [v1](https://github.com/keeth/levity/tree/v1) was overengineered ([Django](https://www.djangoproject.com/), [Docker](https://www.docker.com/), [RabbitMQ](https://www.rabbitmq.com/), [nginx](https://nginx.org/), etc) and over time I realized that I would be better served by something smaller and simpler, with a strong focus on reliability and low resource usage.
+My [v1](https://github.com/keeth/levity/tree/v1) was overengineered (Django, Postgres, Docker, RabbitMQ, nginx, etc) and over time I realized that I would be better served by something smaller and simpler, with a strong focus on reliability and low resource usage.
 
-Levity is a barebones, no-GUI, [SQLite](https://www.sqlite.org/)-backed, single-threaded OCPP server. But complementary tools like [Prometheus](https://prometheus.io/)/[Grafana](https://grafana.com/), [Fluentd](https://www.fluentd.org/), and [Litestream](https://litestream.io/) make it something more like a complete package.
+Levity is a barebones, no-GUI, [SQLite](https://www.sqlite.org/)-backed, single-threaded OCPP server. But complementary tools like [Prometheus](https://prometheus.io/), [Grafana](https://grafana.com/), [Fluentd](https://www.fluentd.org/), and [Litestream](https://litestream.io/) make it something more like a complete package.
 
 I run Levity onsite on a Raspberry Pi with attached SSD storage. It sends metrics and audit logs up to a cloud instance ([Hetzner](https://www.hetzner.com/) / [Coolify](https://coolify.io/)) running the above tools.
 
@@ -16,7 +16,7 @@ I run Levity onsite on a Raspberry Pi with attached SSD storage. It sends metric
 
 - [Fluentd](https://www.fluentd.org/): complete bidirectional logging of OCPP traffic for audit/debug purposes
 
-- [Litestream](https://litestream.io/): replicate the central database to S3 for durability
+- [Litestream](https://litestream.io/): replicate the SQLite database to S3 for durability and data exploration
 
 ## Status of the project
 
