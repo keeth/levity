@@ -6,7 +6,7 @@ Levity is a barebones, no-GUI, [SQLite](https://www.sqlite.org/)-backed, single-
 
 I needed a program to manage a fleet of 20 EV chargers ([Grizzl-e Smart](https://grizzl-e.com/)) at my cohousing development, to track energy use and give observability into the charger network.
 
-My [v1](https://github.com/keeth/levity/tree/v1) was overengineered (Django, Postgres, Docker, RabbitMQ, nginx, etc) and over time I realized that I would be better served by something smaller and simpler, with a strong focus on reliability and low resource usage.
+My [first prototype](https://github.com/keeth/levity/tree/v1) was overengineered (Django, Postgres, Docker, RabbitMQ, nginx, etc) and over time I realized that I would be better served by something smaller and simpler, with a strong focus on reliability and low resource usage.
 
 I run Levity onsite on a Raspberry Pi with attached SSD storage. It sends metrics and audit logs up to a cloud instance ([Hetzner](https://www.hetzner.com/) / [Coolify](https://coolify.io/)).
 
