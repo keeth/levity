@@ -16,8 +16,6 @@ I run Levity onsite on a Raspberry Pi with attached SSD storage. It sends metric
 
 - [Litestream](https://litestream.io/): replicate the SQLite database to S3 for durability and data exploration
 
-- 
-
 ## Status of the project
 
 I fix bugs as I find them in my own installation. Though I'm scratching my own itch here, I've tried to build things in an extensible way, and welcome contributions.
