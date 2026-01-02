@@ -20,15 +20,9 @@ I run Levity onsite on a Raspberry Pi with attached SSD storage. It sends metric
 
 I fix bugs as I find them in my own installation. Though I'm scratching my own itch here, I've tried to build things in an extensible way, and welcome contributions.
 
-## Features
+## OCPP support
 
-- Core [OCPP 1.6](https://www.openchargealliance.org/) JSON protocol (BootNotification, Heartbeat, Status, Transactions, MeterValues, Authorize)
-- Multi-chargepoint WebSocket server
-- SQLite persistence with async I/O
-- Plugin system for extensibility
-- [Prometheus](https://prometheus.io/) metrics
-- [Fluentd](https://www.fluentd.org/) logging
-- Auto remote start for single-owner charging (optional)
+Core [OCPP 1.6](https://www.openchargealliance.org/) JSON protocol is supported - BootNotification, Heartbeat, Status, Transactions, MeterValues
 
 ## Quick Start
 
