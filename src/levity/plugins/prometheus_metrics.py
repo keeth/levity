@@ -221,10 +221,41 @@ class PrometheusMetricsPlugin(ChargePointPlugin):
         }
 
     async def initialize(self, charge_point):
-        """Mark charge point as connected when initialized."""
+        """Mark charge point as connected and restore active transaction metrics."""
         cp_id = charge_point.id
         self.ocpp_cp_connected.labels(cp_id=cp_id).set(1)
         self.ocpp_cp_last_msg_ts.labels(cp_id=cp_id).set(time.time())
+
+        # Restore active transaction metrics from database
+        # This handles server restarts where transactions are still running
+        try:
+            active_txs = await charge_point.tx_repo.get_all_active_for_cp(cp_id)
+            for tx in active_txs:
+                connector = await charge_point.conn_repo.get_by_id(tx.cp_conn_id)
+                if connector:
+                    conn_id = str(connector.conn_id)
+                    self.ocpp_tx_active.labels(cp_id=cp_id, connector_id=conn_id).set(1)
+
+                    # Restore energy if we have meter values
+                    last_meter = await charge_point.meter_repo.get_last_for_transaction(
+                        tx.id
+                    )
+                    if last_meter and tx.meter_start is not None:
+                        try:
+                            current_reading = float(last_meter.value)
+                            tx_energy = current_reading - tx.meter_start
+                            self.ocpp_tx_energy_wh.labels(
+                                cp_id=cp_id, connector_id=conn_id
+                            ).set(tx_energy)
+                        except (ValueError, TypeError):
+                            pass
+
+                    self.logger.info(
+                        f"Restored active transaction metric for {cp_id} "
+                        f"connector {conn_id} (tx_id={tx.id})"
+                    )
+        except Exception as e:
+            self.logger.error(f"Error restoring transaction metrics for {cp_id}: {e}")
 
     async def cleanup(self, charge_point):
         """Mark charge point as disconnected and increment disconnect counter."""
@@ -323,7 +354,7 @@ class PrometheusMetricsPlugin(ChargePointPlugin):
                 self._previous_energy_readings.pop(reading_key, None)
 
         # Reset transaction-related metrics for all connectors on this charge point
-        # Boot means any active transaction is now terminated
+        # Boot means any active transaction is now terminated (charger rebooted)
         try:
             connectors = await context.charge_point.conn_repo.get_all_for_cp(cp_id)
             for connector in connectors:
