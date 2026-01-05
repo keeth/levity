@@ -16,7 +16,9 @@ I run Levity onsite on a Raspberry Pi with attached SSD storage. It sends metric
 
 - [Litestream](https://litestream.io/): replicate the SQLite database to S3 for durability and data exploration
 
-<img width="1704" height="843" alt="Screenshot 2026-01-05 at 4 57 36 AM" src="https://github.com/user-attachments/assets/5b98043b-46a8-4087-a26d-de530eee0d03" />
+Example Grafana dashboard:
+
+<img width="1704" height="843" alt="Example Grafana dashboard showing various charging system metrics" src="https://github.com/user-attachments/assets/5b98043b-46a8-4087-a26d-de530eee0d03" />
 
 ## Status of the project
 
