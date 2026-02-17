@@ -15,6 +15,7 @@ from .handlers import LevityChargePoint
 from .logging_utils import log_error, log_websocket_event
 from .plugins.base import ChargePointPlugin
 from .plugins.prometheus_metrics import PrometheusMetricsPlugin
+from .socket_interface import UnixSocketCommandInterface
 
 logger = logging.getLogger("levity")
 
@@ -39,6 +40,7 @@ class OCPPServer:
         ping_interval: float | None = 20,
         heartbeat_interval: int = 60,
         response_timeout: int = 30,
+        socket_path: str | None = None,
     ):
         self.db = db
         self.host = host
@@ -49,6 +51,8 @@ class OCPPServer:
         self.ping_interval = ping_interval
         self.heartbeat_interval = heartbeat_interval
         self.response_timeout = response_timeout
+        self.socket_path = socket_path
+        self.socket_interface: UnixSocketCommandInterface | None = None
         self.metrics_app = None
         self.metrics_runner = None
 
@@ -285,6 +289,16 @@ class OCPPServer:
         # Start metrics server if configured
         await self.start_metrics_server()
 
+        # Start Unix socket command interface if configured
+        if self.socket_path:
+            self.socket_interface = UnixSocketCommandInterface(
+                socket_path=self.socket_path,
+                server=self,
+                db=self.db,
+                default_timeout=self.response_timeout,
+            )
+            await self.socket_interface.start()
+
         # Start WebSocket server
         async with websockets.serve(
             self.on_connect,
@@ -304,6 +318,10 @@ class OCPPServer:
 
     async def stop(self):
         """Stop the server and cleanup resources."""
+        # Stop socket interface first
+        if self.socket_interface:
+            await self.socket_interface.stop()
+
         # Stop metrics server
         await self.stop_metrics_server()
 

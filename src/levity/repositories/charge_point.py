@@ -104,6 +104,39 @@ class ChargePointRepository(BaseRepository):
         """
         await self._execute(query, (status, cp_id))
 
+    async def get_with_active_transactions(self) -> list[str]:
+        """Get charge point IDs that have at least one active transaction."""
+        rows = await self._fetchall(
+            """
+            SELECT DISTINCT cp_id
+            FROM tx
+            WHERE status = 'Active'
+            ORDER BY cp_id
+            """
+        )
+        return [row["cp_id"] for row in rows]
+
+    async def get_without_active_transactions(self) -> list[str]:
+        """Get charge point IDs that have no active transactions.
+
+        This includes:
+        1. Charge points that have never had a transaction
+        2. Charge points with only completed transactions
+        """
+        rows = await self._fetchall(
+            """
+            SELECT id as cp_id
+            FROM cp
+            WHERE id NOT IN (
+                SELECT DISTINCT cp_id
+                FROM tx
+                WHERE status = 'Active'
+            )
+            ORDER BY id
+            """
+        )
+        return [row["cp_id"] for row in rows]
+
     def _row_to_model(self, row) -> ChargePoint:
         """Convert database row to ChargePoint model."""
         return ChargePoint(

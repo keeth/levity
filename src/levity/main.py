@@ -127,6 +127,11 @@ async def main():
         default="ocpp",
         help="Tag prefix for Fluentd events (default: ocpp)",
     )
+    parser.add_argument(
+        "--socket-path",
+        default=None,
+        help="Path to Unix socket for command interface (default: disabled)",
+    )
 
     args = parser.parse_args()
 
@@ -164,6 +169,8 @@ async def main():
                 else None,
                 "fluentd_enabled": args.fluentd_endpoint is not None,
                 "fluentd_endpoint": args.fluentd_endpoint,
+                "socket_enabled": args.socket_path is not None,
+                "socket_path": args.socket_path,
             },
         },
     )
@@ -227,6 +234,7 @@ async def main():
         ping_interval=ping_interval,
         heartbeat_interval=args.heartbeat_interval,
         response_timeout=args.response_timeout,
+        socket_path=args.socket_path,
     )
 
     try:
