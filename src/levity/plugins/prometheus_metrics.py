@@ -267,7 +267,9 @@ class PrometheusMetricsPlugin(ChargePointPlugin):
             for _ in active_txs:
                 self.ocpp_cp_reconnect_during_tx_total.labels(cp_id=cp_id).inc()
 
-        self.ocpp_cp_connected.labels(cp_id=cp_id).set(0)
+        # Leave the gauge alone if a newer connection for this CP is already live
+        if not charge_point.replaced:
+            self.ocpp_cp_connected.labels(cp_id=cp_id).set(0)
         self.ocpp_cp_disconnects_total.labels(cp_id=cp_id).inc()
 
     # Helper methods

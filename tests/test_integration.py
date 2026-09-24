@@ -1,6 +1,7 @@
 """Integration tests for OCPP server with WebSocket communication."""
 
 import asyncio
+import contextlib
 from datetime import UTC, datetime
 
 import pytest
@@ -552,3 +553,52 @@ class TestOCPPIntegration:
             except asyncio.CancelledError:
                 pass
             await server.stop()
+
+
+@pytest.mark.asyncio
+async def test_reconnect_keeps_charge_point_marked_connected(temp_db):
+    """A CP that reconnects (replacing its old socket) must stay marked connected.
+
+    The old connection's cleanup runs after the new connection registers, and must
+    not flip the connected gauge / DB flag back to disconnected.
+    """
+    from levity.plugins import PrometheusMetricsPlugin
+
+    cp_id = "TEST_CP_RECONNECT"
+    server = OCPPServer(
+        temp_db, host="127.0.0.1", port=19003, plugin_factory=lambda: [PrometheusMetricsPlugin()]
+    )
+    server_task = asyncio.create_task(server.start())
+    await asyncio.sleep(1.0)
+
+    def connected_gauge():
+        for sample in PrometheusMetricsPlugin.ocpp_cp_connected.collect()[0].samples:
+            if sample.labels == {"cp_id": cp_id}:
+                return sample.value
+        return None
+
+    try:
+        url = f"ws://127.0.0.1:19003/ws/{cp_id}"
+        async with websockets.connect(url, subprotocols=["ocpp1.6"]) as ws1:
+            client1 = MockOCPPClient(cp_id, ws1)
+            task1 = asyncio.create_task(client1.start())
+            await client1.send_boot_notification("TestVendor", "TestModel")
+
+            # Charger reconnects on a new socket while the old one is still registered
+            async with websockets.connect(url, subprotocols=["ocpp1.6"]) as ws2:
+                client2 = MockOCPPClient(cp_id, ws2)
+                task2 = asyncio.create_task(client2.start())
+                await client2.send_boot_notification("TestVendor", "TestModel")
+                await asyncio.sleep(0.5)  # let old connection's cleanup finish
+
+                assert connected_gauge() == 1.0
+                cp = await ChargePointRepository(await temp_db.connect()).get_by_id(cp_id)
+                assert cp.is_connected
+
+                task2.cancel()
+            task1.cancel()
+    finally:
+        server_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError, Exception):
+            await server_task
+        await server.stop()

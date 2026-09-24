@@ -54,6 +54,8 @@ class LevityChargePoint(BaseChargePoint):
         self.db = db_connection
         self.heartbeat_interval = heartbeat_interval
         self.remote_address = remote_address
+        # Set when a newer connection for the same CP replaces this one
+        self.replaced = False
 
         # Heartbeat watchdog: disconnect after 3x heartbeat interval with no heartbeats
         self.heartbeat_timeout = heartbeat_interval * 3
@@ -678,7 +680,10 @@ class LevityChargePoint(BaseChargePoint):
 
     async def on_disconnect(self):
         """Handle charge point disconnection."""
-        await self.cp_repo.update_connection_status(self.id, False)
+        # A replaced connection must not mark the CP disconnected: the newer
+        # connection for the same CP is already live
+        if not self.replaced:
+            await self.cp_repo.update_connection_status(self.id, False)
 
         # Cleanup plugins
         for plugin in self.plugins:

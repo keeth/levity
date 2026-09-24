@@ -116,6 +116,7 @@ class OCPPServer:
                     remote_address=remote_address,
                     old_remote_address=old_addr,
                 )
+                existing_cp.replaced = True
                 with contextlib.suppress(Exception):
                     await existing_cp._connection.close(1000, "Replaced by new connection")
                 # Don't delete from dict here - let the old handler's finally block handle it
